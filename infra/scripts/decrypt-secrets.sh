@@ -32,4 +32,10 @@ sops --decrypt --extract '["authelia_storage_key"]'    "$SOPS_FILE" > "$SECRETS_
 sops --decrypt --extract '["grafana_admin_password"]'  "$SOPS_FILE" > "$SECRETS_DIR/grafana_admin_password.txt"
 
 chmod 600 "$SECRETS_DIR"/*.txt
+
+# Write .env for docker compose variable substitution
+DB_PASSWORD=$(sops --decrypt --extract '["db_password"]' "$SOPS_FILE")
+printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD" > "$SCRIPT_DIR/../compose/.env"
+chmod 600 "$SCRIPT_DIR/../compose/.env"
+
 echo "Secrets decrypted OK."
