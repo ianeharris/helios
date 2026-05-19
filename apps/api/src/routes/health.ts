@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db/client.js';
 
-export const healthRoutes = async (app: FastifyInstance): Promise<void> => {
+export const healthRoutes = (app: FastifyInstance): void => {
   app.get('/health', async (_req, reply) => {
     try {
       await getDb().query('SELECT 1');

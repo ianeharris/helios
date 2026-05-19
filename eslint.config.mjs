@@ -9,7 +9,9 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["*.config.ts", "adapters/*/vitest.config.ts", "apps/*/vite.config.ts"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
