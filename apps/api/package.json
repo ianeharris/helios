@@ -1,0 +1,28 @@
+{
+  "name": "@helios/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@helios/shared": "*",
+    "fastify": "^4.28.0",
+    "mqtt": "^5.10.0",
+    "pg": "^8.12.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.0.0",
+    "typescript": "*",
+    "vitest": "^2.0.0"
+  }
+}

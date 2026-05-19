@@ -1,0 +1,36 @@
+server:
+  host: 0.0.0.0
+  port: 9091
+
+log:
+  level: info
+
+jwt_secret: "{{ secret '/run/secrets/authelia_jwt_secret' }}"
+
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+    password:
+      algorithm: argon2id
+
+access_control:
+  default_policy: one_factor
+  rules:
+    - domain: helios.lan
+      policy: one_factor
+
+session:
+  name: helios_session
+  secret: "{{ secret '/run/secrets/authelia_session_secret' }}"
+  expiration: 12h
+  inactivity: 4h
+  domain: helios.lan
+
+storage:
+  encryption_key: "{{ secret '/run/secrets/authelia_storage_key' }}"
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt

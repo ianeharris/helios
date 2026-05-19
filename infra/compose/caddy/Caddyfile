@@ -1,0 +1,24 @@
+helios.lan {
+    # Forward auth to Authelia for every request
+    forward_auth authelia:9091 {
+        uri /api/verify?rd=https://helios.lan/auth
+        copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
+    }
+
+    # PWA frontend
+    reverse_proxy /app/* web:80
+
+    # API
+    reverse_proxy /api/* api:3000
+
+    # Grafana
+    reverse_proxy /grafana/* grafana:3000
+
+    # Authelia login portal
+    reverse_proxy /auth* authelia:9091
+
+    # Health probe (no auth required)
+    handle /health {
+        reverse_proxy api:3000
+    }
+}

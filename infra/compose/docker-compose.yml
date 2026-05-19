@@ -1,0 +1,167 @@
+name: helios
+
+services:
+
+  # ── Database ─────────────────────────────────────────────────────────────────
+
+  db:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: helios
+      POSTGRES_USER: helios
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helios"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Message broker ────────────────────────────────────────────────────────────
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    ports:
+      - "127.0.0.1:1883:1883"
+
+  # ── API ───────────────────────────────────────────────────────────────────────
+
+  api:
+    image: ghcr.io/ianharris64/helios-api:${HELIOS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://helios:${DB_PASSWORD}@db:5432/helios
+      MQTT_URL: mqtt://mosquitto:1883
+      PORT: "3000"
+    secrets:
+      - db_password
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/health | grep -q ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Adapters ──────────────────────────────────────────────────────────────────
+  # Each adapter is a separate container - they fail independently.
+  # Phase 1+ images; commented out until the relevant phase starts.
+
+  # adapter-hue:
+  #   image: ghcr.io/ianharris64/helios-adapter-hue:${HELIOS_VERSION:-latest}
+  #   restart: unless-stopped
+  #   depends_on: [mosquitto]
+  #   environment:
+  #     HUE_BRIDGE_IP: ${HUE_BRIDGE_IP}
+  #     HUE_APP_KEY: ${HUE_APP_KEY}
+  #     MQTT_URL: mqtt://mosquitto:1883
+
+  # ── Web frontend ─────────────────────────────────────────────────────────────
+
+  web:
+    image: ghcr.io/ianharris64/helios-web:${HELIOS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── Reverse proxy + auth ──────────────────────────────────────────────────────
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api, web, authelia]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  authelia:
+    image: authelia/authelia:4
+    restart: unless-stopped
+    volumes:
+      - ./authelia/configuration.yml:/config/configuration.yml:ro
+      - authelia_data:/config
+    environment:
+      AUTHELIA_JWT_SECRET_FILE: /run/secrets/authelia_jwt_secret
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session_secret
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage_key
+    secrets:
+      - authelia_jwt_secret
+      - authelia_session_secret
+      - authelia_storage_key
+
+  # ── Observability ─────────────────────────────────────────────────────────────
+
+  grafana:
+    image: grafana/grafana-oss:11.1.0
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      GF_SERVER_ROOT_URL: https://helios.lan/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_AUTH_PROXY_ENABLED: "true"
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "127.0.0.1:3001:3000"
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+# ── Secrets (Docker secrets from SOPS-decrypted files at deploy time) ──────────
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  authelia_jwt_secret:
+    file: ./secrets/authelia_jwt_secret.txt
+  authelia_session_secret:
+    file: ./secrets/authelia_session_secret.txt
+  authelia_storage_key:
+    file: ./secrets/authelia_storage_key.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+
+volumes:
+  db_data:
+  mosquitto_data:
+  mosquitto_log:
+  caddy_data:
+  caddy_config:
+  authelia_data:
+  grafana_data:
+  prometheus_data:

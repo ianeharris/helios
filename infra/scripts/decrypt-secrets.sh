@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Decrypt SOPS secrets into the compose secrets/ directory before docker compose up.
+# Runs on the Mac mini at deploy time. Requires age key at ~/helios/age.key
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SECRETS_DIR="$SCRIPT_DIR/../compose/secrets"
+SOPS_FILE="$SCRIPT_DIR/../secrets/secrets.yaml"
+AGE_KEY="${HELIOS_AGE_KEY_FILE:-$HOME/helios/age.key}"
+
+if [[ ! -f "$AGE_KEY" ]]; then
+  echo "ERROR: age key not found at $AGE_KEY" >&2
+  exit 1
+fi
+
+if [[ ! -f "$SOPS_FILE" ]]; then
+  echo "ERROR: encrypted secrets file not found at $SOPS_FILE" >&2
+  exit 1
+fi
+
+export SOPS_AGE_KEY_FILE="$AGE_KEY"
+
+mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
+
+# Extract each secret into its own file (Docker secrets format)
+sops --decrypt --extract '["db_password"]'             "$SOPS_FILE" > "$SECRETS_DIR/db_password.txt"
+sops --decrypt --extract '["authelia_jwt_secret"]'     "$SOPS_FILE" > "$SECRETS_DIR/authelia_jwt_secret.txt"
+sops --decrypt --extract '["authelia_session_secret"]' "$SOPS_FILE" > "$SECRETS_DIR/authelia_session_secret.txt"
+sops --decrypt --extract '["authelia_storage_key"]'    "$SOPS_FILE" > "$SECRETS_DIR/authelia_storage_key.txt"
+sops --decrypt --extract '["grafana_admin_password"]'  "$SOPS_FILE" > "$SECRETS_DIR/grafana_admin_password.txt"
+
+chmod 600 "$SECRETS_DIR"/*.txt
+echo "Secrets decrypted OK."

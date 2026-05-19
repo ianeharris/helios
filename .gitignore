@@ -1,0 +1,27 @@
+node_modules/
+dist/
+.env
+*.env.local
+.yarn/cache
+.yarn/install-state.gz
+# SOPS-encrypted secrets.yaml IS committed (encrypted form only).
+# Plain-text files decrypted at deploy time are never committed.
+infra/compose/secrets/*.txt
+infra/compose/.env
+# The plaintext secrets.yaml must never be committed; only the encrypted version is.
+# Both share the same filename - gitignore it and rely on the developer to only
+# commit after running `sops --encrypt --in-place`.
+# (The .example template is committed and is explicitly excluded from this rule.)
+*.age
+age.key
+
+# Editor
+.DS_Store
+.idea/
+.vscode/settings.json
+
+# Container volumes baked out locally during dev
+infra/volumes/
+
+# Test coverage
+coverage/
