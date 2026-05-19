@@ -152,6 +152,7 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Wait for Tailscale connectivity
+        continue-on-error: true
         run: tailscale ping --c 3 ${{ secrets.MAC_MINI_HOST }}
 
       - name: Deploy via SSH
