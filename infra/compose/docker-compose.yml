@@ -39,7 +39,7 @@ services:
   # ── API ───────────────────────────────────────────────────────────────────────
 
   api:
-    image: ghcr.io/ianharris64/helios-api:${HELIOS_VERSION:-latest}
+    image: ghcr.io/ianeharris/helios-api:${HELIOS_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       db:
@@ -65,7 +65,7 @@ services:
   # Phase 1+ images; commented out until the relevant phase starts.
 
   # adapter-hue:
-  #   image: ghcr.io/ianharris64/helios-adapter-hue:${HELIOS_VERSION:-latest}
+  #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:-latest}
   #   restart: unless-stopped
   #   depends_on: [mosquitto]
   #   environment:
@@ -79,7 +79,7 @@ services:
   # ── Web frontend ─────────────────────────────────────────────────────────────
 
   web:
-    image: ghcr.io/ianharris64/helios-web:${HELIOS_VERSION:-latest}
+    image: ghcr.io/ianeharris/helios-web:${HELIOS_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       api:
