@@ -162,9 +162,10 @@ jobs:
           username: ${{ secrets.MAC_MINI_USER }}
           key: ${{ secrets.MAC_MINI_SSH_KEY }}
           script: |
+            export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
             cd ~/Solar
             git pull --ff-only
-            HELIOS_VERSION=${{ github.sha }} bash infra/scripts/decrypt-secrets.sh
+            HELIOS_VERSION=${{ github.sha }} HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh
             cd infra/compose
             HELIOS_VERSION=${{ github.sha }} docker compose pull
             HELIOS_VERSION=${{ github.sha }} docker compose up -d
