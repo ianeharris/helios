@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MqttClient } from 'mqtt';
-import type { HueLightResource, HueRoomResource, HueGroupedLightResource, HueSceneResource } from '../types.js';
+import type { HueLightResource, HueRoomResource, HueGroupedLightResource, HueSceneResource, HueLightState, HueRoomState } from '../types.js';
 
 // We test the BridgeManager's SSE event handling in isolation by mocking
 // the API calls and SSE connection, then feeding synthetic events.
@@ -77,7 +77,7 @@ describe('BridgeManager', () => {
       m.topic === `helios/hue/${bridge.id}/light/light-1`,
     );
     expect(lightMsg).toBeDefined();
-    const state = JSON.parse(lightMsg!.payload);
+    const state = JSON.parse(lightMsg!.payload) as HueLightState;
     expect(state.on).toBe(false);
     expect(state.brightness).toBe(50);
     expect(state.name).toBe('Lounge Main');
@@ -91,7 +91,7 @@ describe('BridgeManager', () => {
       m.topic === `helios/hue/${bridge.id}/room/gl-1`,
     );
     expect(roomMsg).toBeDefined();
-    const state = JSON.parse(roomMsg!.payload);
+    const state = JSON.parse(roomMsg!.payload) as HueRoomState;
     expect(state.name).toBe('Lounge');
     expect(state.anyOn).toBe(false);
   });

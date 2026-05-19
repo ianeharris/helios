@@ -24,7 +24,7 @@ const res = await fetch(`https://${ip}/api`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ devicetype: 'helios#mac-mini', generateclientkey: true }),
-  // @ts-expect-error
+  // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
   agent,
 });
 

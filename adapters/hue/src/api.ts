@@ -20,7 +20,7 @@ const clip = async <T>(bridge: BridgeConfig, path: string): Promise<T> => {
   const url = `https://${bridge.ip}/clip/v2/${path}`;
   const res = await fetch(url, {
     headers: { 'hue-application-key': bridge.appKey },
-    // @ts-expect-error - node-fetch dispatcher / undici agent type mismatch
+    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
     agent,
   });
   if (!res.ok) {
@@ -60,7 +60,7 @@ export const setLightState = async (
     method: 'PUT',
     headers: { 'hue-application-key': bridge.appKey, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    // @ts-expect-error
+    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
     agent,
   });
   if (!res.ok) throw new Error(`Set light ${lightId} failed: HTTP ${res.status}`);
@@ -72,7 +72,7 @@ export const recallScene = async (bridge: BridgeConfig, sceneId: string): Promis
     method: 'PUT',
     headers: { 'hue-application-key': bridge.appKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ recall: { action: 'active' } }),
-    // @ts-expect-error
+    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
     agent,
   });
   if (!res.ok) throw new Error(`Recall scene ${sceneId} failed: HTTP ${res.status}`);
