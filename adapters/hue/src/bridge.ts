@@ -31,9 +31,11 @@ const lightToState = (bridge: BridgeConfig, r: HueLightResource): HueLightState 
   resourceId: r.id,
   name: r.metadata.name,
   on: r.on.on,
-  brightness: r.dimming?.brightness,
-  colorTemp: r.color_temperature?.mirek_valid ? (r.color_temperature.mirek ?? undefined) : undefined,
-  xy: r.color?.xy,
+  ...(r.dimming !== undefined && { brightness: r.dimming.brightness }),
+  ...(r.color_temperature?.mirek_valid && r.color_temperature.mirek !== null
+    ? { colorTemp: r.color_temperature.mirek }
+    : {}),
+  ...(r.color?.xy !== undefined && { xy: r.color.xy }),
   reachable: true,
 });
 
@@ -47,7 +49,7 @@ const groupedLightToState = (
   name: room?.metadata.name ?? gl.id,
   anyOn: gl.on.on,
   allOn: gl.on.on,
-  brightness: gl.dimming?.brightness,
+  ...(gl.dimming !== undefined && { brightness: gl.dimming.brightness }),
 });
 
 export class BridgeManager {
