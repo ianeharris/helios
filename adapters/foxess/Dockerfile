@@ -6,7 +6,7 @@ FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json packages/shared/
 COPY adapters/foxess/package.json adapters/foxess/
-RUN yarn workspaces focus @helios/adapter-foxess --production=false
+RUN yarn workspaces focus @helios/adapter-foxess 
 
 FROM deps AS build
 COPY tsconfig.base.json ./

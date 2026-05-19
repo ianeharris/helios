@@ -6,7 +6,7 @@ FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json packages/shared/
 COPY adapters/sonos/package.json adapters/sonos/
-RUN yarn workspaces focus @helios/adapter-sonos --production=false
+RUN yarn workspaces focus @helios/adapter-sonos 
 
 FROM deps AS build
 COPY tsconfig.base.json ./

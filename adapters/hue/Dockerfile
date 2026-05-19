@@ -6,7 +6,7 @@ FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json packages/shared/
 COPY adapters/hue/package.json adapters/hue/
-RUN yarn workspaces focus @helios/adapter-hue --production=false
+RUN yarn workspaces focus @helios/adapter-hue 
 
 FROM deps AS build
 COPY tsconfig.base.json ./

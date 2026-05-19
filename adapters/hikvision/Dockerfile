@@ -6,7 +6,7 @@ FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json packages/shared/
 COPY adapters/hikvision/package.json adapters/hikvision/
-RUN yarn workspaces focus @helios/adapter-hikvision --production=false
+RUN yarn workspaces focus @helios/adapter-hikvision 
 
 FROM deps AS build
 COPY tsconfig.base.json ./

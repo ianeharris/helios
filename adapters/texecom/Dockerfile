@@ -6,7 +6,7 @@ FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json packages/shared/
 COPY adapters/texecom/package.json adapters/texecom/
-RUN yarn workspaces focus @helios/adapter-texecom --production=false
+RUN yarn workspaces focus @helios/adapter-texecom 
 
 FROM deps AS build
 COPY tsconfig.base.json ./

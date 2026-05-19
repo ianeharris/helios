@@ -6,7 +6,7 @@ FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
-RUN yarn workspaces focus @helios/api --production=false
+RUN yarn workspaces focus @helios/api 
 
 FROM deps AS build
 COPY tsconfig.base.json ./
