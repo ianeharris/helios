@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db/client.js';
 
-export const healthRoutes = (app: FastifyInstance): void => {
+export const healthRoutes = (app: FastifyInstance, _opts: unknown, done: () => void): void => {
   app.get('/health', async (_req, reply) => {
     try {
       await getDb().query('SELECT 1');
@@ -10,4 +10,5 @@ export const healthRoutes = (app: FastifyInstance): void => {
       return reply.status(503).send({ status: 'error', db: 'unreachable' });
     }
   });
+  done();
 };
