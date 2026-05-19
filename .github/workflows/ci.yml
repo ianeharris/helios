@@ -84,6 +84,7 @@ jobs:
       packages: write
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - context: apps/api
