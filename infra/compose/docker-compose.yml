@@ -69,9 +69,12 @@ services:
   #   restart: unless-stopped
   #   depends_on: [mosquitto]
   #   environment:
-  #     HUE_BRIDGE_IP: ${HUE_BRIDGE_IP}
-  #     HUE_APP_KEY: ${HUE_APP_KEY}
+  #     # Two Bridge v2 units; see infra/compose/.env.example for format
+  #     HUE_BRIDGES: ${HUE_BRIDGES}
   #     MQTT_URL: mqtt://mosquitto:1883
+  #   secrets:
+  #     - hue_app_key_bradgate
+  #     - hue_app_key_bradgate2
 
   # ── Web frontend ─────────────────────────────────────────────────────────────
 
