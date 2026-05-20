@@ -1,4 +1,4 @@
 creation_rules:
   - path_regex: infra/secrets/.*\.yaml$
     age: >-
-      age1REPLACE_WITH_YOUR_AGE_PUBLIC_KEY
+      age12wzlmlk8y7h7xahfe8qh7lm0e2allh82l824hvuzzt596ghr9psqccmf84
