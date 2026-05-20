@@ -9,7 +9,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/ian/helios/infra/scripts/backup-db.sh</string>
+        <string>/Users/ian/Solar/infra/scripts/backup-db.sh</string>
     </array>
 
     <key>StartCalendarInterval</key>
@@ -21,9 +21,9 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/ian/helios/logs/backup.log</string>
+    <string>/Users/ian/Solar/logs/backup.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/ian/helios/logs/backup-error.log</string>
+    <string>/Users/ian/Solar/logs/backup-error.log</string>
 
     <key>RunAtLoad</key>
     <false/>

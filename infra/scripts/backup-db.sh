@@ -25,7 +25,7 @@ fi
 mkdir -p "$BACKUP_DIR"
 
 # Dump from the running db container using pg_dump
-docker exec helios-db-1 \
+/usr/local/bin/docker exec helios-db-1 \
   pg_dump \
     --username helios \
     --format custom \
