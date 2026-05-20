@@ -1,39 +1,33 @@
 #!/usr/bin/env bash
-# Nightly Postgres dump to NAS SMB share.
-# Schedule via launchd on the Mac mini (see infra/launchd/helios-backup.plist).
+# Nightly Postgres dump to NAS via SSH pipe.
+# Schedule via launchd on the Mac mini (see infra/launchd/com.helios.backup.plist).
 #
-# Target: smb://192.168.86.4/helios/db-backup
+# Target: ian@192.168.86.4:/volume1/helios/db-backup/
 # Retention: 30 days
 
 set -euo pipefail
 
-NAS_MOUNT="/Volumes/helios-backup"
-NAS_SHARE="//192.168.86.4/helios"
-BACKUP_DIR="$NAS_MOUNT/db-backup"
-RETAIN_DAYS=30
+NAS_USER="ian"
+NAS_HOST="192.168.86.4"
+NAS_KEY="/Users/ian/.ssh/id_nas"
+NAS_BACKUP_DIR="/volume1/helios/db-backup"
 TIMESTAMP=$(date +%Y%m%dT%H%M%S)
-DUMP_FILE="$BACKUP_DIR/helios-$TIMESTAMP.dump"
+REMOTE_FILE="$NAS_BACKUP_DIR/helios-$TIMESTAMP.dump"
+RETAIN_DAYS=30
 
-# Mount the NAS share if not already mounted
-if ! mount | grep -q "$NAS_MOUNT"; then
-  mkdir -p "$NAS_MOUNT"
-  # Credentials come from macOS Keychain (set once manually):
-  #   security add-internet-password -a helios -s 192.168.86.4 -w <password>
-  mount_smbfs "$NAS_SHARE" "$NAS_MOUNT"
-fi
+SSH="/usr/bin/ssh -i $NAS_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
 
-mkdir -p "$BACKUP_DIR"
-
-# Dump from the running db container using pg_dump
+# Pipe pg_dump directly to NAS over SSH - avoids SMB and temp file complexity
 /usr/local/bin/docker exec helios-db-1 \
   pg_dump \
     --username helios \
     --format custom \
     --compress 9 \
-    helios > "$DUMP_FILE"
+    helios \
+  | $SSH "$NAS_USER@$NAS_HOST" "cat > $REMOTE_FILE"
 
-echo "Backup written: $DUMP_FILE ($(du -sh "$DUMP_FILE" | cut -f1))"
+echo "Backup written: $REMOTE_FILE"
 
-# Prune backups older than RETAIN_DAYS
-find "$BACKUP_DIR" -name "helios-*.dump" -mtime +"$RETAIN_DAYS" -delete
-echo "Pruned backups older than ${RETAIN_DAYS} days."
+# Prune backups older than RETAIN_DAYS on the NAS
+$SSH "$NAS_USER@$NAS_HOST" \
+  "find $NAS_BACKUP_DIR -name 'helios-*.dump' -mtime +$RETAIN_DAYS -delete && echo 'Pruned backups older than ${RETAIN_DAYS} days.'"
