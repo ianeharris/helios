@@ -31,6 +31,9 @@ sops --decrypt --extract '["authelia_session_secret"]' "$SOPS_FILE" > "$SECRETS_
 sops --decrypt --extract '["authelia_storage_key"]'    "$SOPS_FILE" > "$SECRETS_DIR/authelia_storage_key.txt"
 sops --decrypt --extract '["grafana_admin_password"]'  "$SOPS_FILE" > "$SECRETS_DIR/grafana_admin_password.txt"
 
+# Phase 1+ adapter secrets (only extracted if present in secrets.yaml)
+sops --decrypt --extract '["octopus_api_key"]' "$SOPS_FILE" > "$SECRETS_DIR/octopus_api_key.txt" 2>/dev/null || true
+
 chmod 600 "$SECRETS_DIR"/*.txt
 
 # Write .env for docker compose variable substitution

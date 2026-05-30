@@ -93,6 +93,8 @@ jobs:
             image: helios-web
           - context: adapters/hue
             image: helios-adapter-hue
+          - context: adapters/octopus
+            image: helios-adapter-octopus
           - context: adapters/sonos
             image: helios-adapter-sonos
           - context: adapters/hikvision

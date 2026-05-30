@@ -64,6 +64,17 @@ services:
   # Each adapter is a separate container - they fail independently.
   # Phase 1+ images; commented out until the relevant phase starts.
 
+  adapter-octopus:
+    image: ghcr.io/ianeharris/helios-adapter-octopus:${HELIOS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on: [mosquitto]
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+      OCTOPUS_IMPORT_PRODUCT: INTELLI-VAR-24-10-29
+      OCTOPUS_IMPORT_TARIFF: E-1R-INTELLI-VAR-24-10-29-A
+      OCTOPUS_EXPORT_PRODUCT: OUTGOING-VAR-24-10-26
+      OCTOPUS_EXPORT_TARIFF: E-1R-OUTGOING-VAR-24-10-26-A
+
   # adapter-hue:
   #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:-latest}
   #   restart: unless-stopped
