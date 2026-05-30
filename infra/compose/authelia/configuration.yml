@@ -16,15 +16,24 @@ authentication_backend:
 access_control:
   default_policy: one_factor
   rules:
-    - domain: helios.lan
+    - domain:
+        - helios.lan
+        - ians-mac-mini.tailfc238d.ts.net
       policy: one_factor
 
 session:
-  name: helios_session
   secret: "{{ secret '/run/secrets/authelia_session_secret' }}"
-  expiration: 12h
-  inactivity: 4h
-  domain: helios.lan
+  cookies:
+    - name: helios_session
+      domain: helios.lan
+      authelia_url: https://helios.lan/auth
+      expiration: 12h
+      inactivity: 4h
+    - name: helios_session_ts
+      domain: ians-mac-mini.tailfc238d.ts.net
+      authelia_url: https://ians-mac-mini.tailfc238d.ts.net/auth
+      expiration: 12h
+      inactivity: 4h
 
 storage:
   encryption_key: "{{ secret '/run/secrets/authelia_storage_key' }}"

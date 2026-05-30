@@ -1,4 +1,4 @@
-helios.lan {
+helios.lan, ians-mac-mini.tailfc238d.ts.net {
     tls internal
 
     header {
@@ -58,7 +58,7 @@ helios.lan {
     # Everything else requires authentication
     handle {
         forward_auth authelia:9091 {
-            uri /api/verify?rd=https://helios.lan/auth
+            uri /api/verify?rd=https://{host}/auth
             copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
         }
 
