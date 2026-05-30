@@ -1,12 +1,11 @@
 helios.lan {
+    tls internal
+
     # Forward auth to Authelia for every request
     forward_auth authelia:9091 {
         uri /api/verify?rd=https://helios.lan/auth
         copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
     }
-
-    # PWA frontend
-    reverse_proxy /app/* web:80
 
     # API — strip /api prefix so routes don't need to know they're mounted there
     handle /api/* {
@@ -15,13 +14,22 @@ helios.lan {
     }
 
     # Grafana
-    reverse_proxy /grafana/* grafana:3000
+    handle /grafana/* {
+        reverse_proxy grafana:3000
+    }
 
     # Authelia login portal
-    reverse_proxy /auth* authelia:9091
+    handle /auth* {
+        reverse_proxy authelia:9091
+    }
 
     # Health probe (no auth required)
     handle /health {
         reverse_proxy api:3000
+    }
+
+    # PWA frontend — catch-all so React Router handles all paths
+    handle {
+        reverse_proxy web:80
     }
 }
