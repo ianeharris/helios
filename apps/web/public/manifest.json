@@ -1,7 +1,7 @@
 {
   "name": "Helios",
   "short_name": "Helios",
-  "description": "Home automation hub for 28 Bradgate",
+  "description": "Home automation hub",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

@@ -31,6 +31,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     ports:
@@ -69,7 +71,7 @@ services:
     restart: unless-stopped
     depends_on: [mosquitto]
     environment:
-      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_URL: mqtt://octopus:${MQTT_PASSWORD_OCTOPUS}@mosquitto:1883
       OCTOPUS_IMPORT_PRODUCT: INTELLI-VAR-24-10-29
       OCTOPUS_IMPORT_TARIFF: E-1R-INTELLI-VAR-24-10-29-A
       OCTOPUS_EXPORT_PRODUCT: OUTGOING-VAR-24-10-26

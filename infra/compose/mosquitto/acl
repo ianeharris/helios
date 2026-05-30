@@ -1,0 +1,33 @@
+# Helios MQTT ACL
+# Format: user <username> / topic <access> <topic>
+# access: read=1, write=2, readwrite=4
+
+user octopus
+topic write helios/energy/tariff/state
+
+user hue
+topic write helios/lights/#
+topic read helios/lights/+/set
+
+user sonos
+topic write helios/audio/#
+topic read helios/audio/+/command
+
+user api
+topic read helios/#
+topic write helios/+/command
+
+user foxess
+topic write helios/energy/solar/#
+topic write helios/energy/battery/#
+topic write helios/energy/grid/#
+
+user hikvision
+topic write helios/security/cameras/#
+
+user texecom
+topic write helios/security/alarm/#
+
+user hive
+topic write helios/heating/#
+topic read helios/heating/+/set
