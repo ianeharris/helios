@@ -8,8 +8,11 @@ helios.lan {
     # PWA frontend
     reverse_proxy /app/* web:80
 
-    # API
-    reverse_proxy /api/* api:3000
+    # API — strip /api prefix so routes don't need to know they're mounted there
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy api:3000
+    }
 
     # Grafana
     reverse_proxy /grafana/* grafana:3000

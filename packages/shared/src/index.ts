@@ -4,3 +4,4 @@
 export * from './types/device.js';
 export * from './types/event.js';
 export * from './types/room.js';
+export * from './types/tariff.js';

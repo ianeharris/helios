@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  --color-helios-cheap: #4ade80;    /* green-400 */
+  --color-helios-standard: #94a3b8; /* slate-400 */
+  --color-helios-solar: #fbbf24;    /* amber-400 */
+  --color-helios-export: #34d399;   /* emerald-400 */
+}
