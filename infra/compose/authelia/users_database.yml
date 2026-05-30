@@ -1,0 +1,9 @@
+---
+users:
+  ian:
+    disabled: false
+    displayname: "Ian Harris"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$rT9zatv2JTGvlWbzT093ZA$SGZqkSlBcY8VNJtBT/vCMqopoC/xV8DU+glB0oAF5KE"
+    email: ianharris64@gmail.com
+    groups:
+      - admins
