@@ -1,93 +1,56 @@
 /**
  * Helios Octopus Energy adapter.
  *
- * Polls the public Octopus tariff API and publishes rate data to MQTT.
- * No vendor authentication required for tariff rate data.
+ * Topics published:
+ *   helios/energy/tariff/state                (retained) TariffState — current rate, upcoming slots
+ *   helios/energy/octopus/tariff_transition   (event)    TariffTransitionEvent — on every rate change
+ *   helios/energy/octopus/dispatch_schedule   (retained) DispatchScheduleMessage — tonight's Intelligent slots
+ *   helios/energy/octopus/saving_session      (retained) SavingSessionMessage — announced/active sessions
+ *   helios/energy/octopus/consumption/import  (retained) ConsumptionBatch — yesterday's import half-hours
+ *   helios/energy/octopus/consumption/export  (retained) ConsumptionBatch — yesterday's export half-hours
  *
- * Topics published (all retained):
- *   helios/energy/tariff/state  — TariffState: current type, rate, next transition, export rate
- *
- * Environment:
- *   MQTT_URL               Internal broker (default: mqtt://mosquitto:1883)
- *   OCTOPUS_IMPORT_PRODUCT Octopus product code for import tariff
- *   OCTOPUS_IMPORT_TARIFF  Octopus tariff code for import
- *   OCTOPUS_EXPORT_PRODUCT Octopus product code for export tariff
- *   OCTOPUS_EXPORT_TARIFF  Octopus tariff code for export
- *   OCTOPUS_POLL_INTERVAL  Poll interval in ms (default: 1800000 = 30 min)
- *   OCTOPUS_CHEAP_THRESHOLD_PENCE  Rate below which a slot is "cheap" (default: 15)
+ * Schedule:
+ *   Every 30 min  — tariff state + transition detection
+ *   02:00 daily   — yesterday's smart meter consumption
+ *   05:00 daily   — live rate refresh from API
+ *   09:00 daily   — saving sessions check
+ *   20:00 daily   — Intelligent dispatch schedule for tonight
  */
 
 import mqtt from 'mqtt';
-import { fetchImportRates, fetchExportRate } from './api.js';
-import type { TariffSlot, TariffState, OctopusRateResult } from './types.js';
-
-// ── Config ────────────────────────────────────────────────────────────────────
-
-const MQTT_URL = process.env['MQTT_URL'] ?? 'mqtt://mosquitto:1883';
-const IMPORT_PRODUCT = process.env['OCTOPUS_IMPORT_PRODUCT'] ?? 'INTELLI-VAR-24-10-29';
-const IMPORT_TARIFF = process.env['OCTOPUS_IMPORT_TARIFF'] ?? 'E-1R-INTELLI-VAR-24-10-29-A';
-const EXPORT_PRODUCT = process.env['OCTOPUS_EXPORT_PRODUCT'] ?? 'OUTGOING-VAR-24-10-26';
-const EXPORT_TARIFF = process.env['OCTOPUS_EXPORT_TARIFF'] ?? 'E-1R-OUTGOING-VAR-24-10-26-A';
-const POLL_INTERVAL_MS = parseInt(process.env['OCTOPUS_POLL_INTERVAL'] ?? '1800000', 10);
-const CHEAP_THRESHOLD_PENCE = parseFloat(process.env['OCTOPUS_CHEAP_THRESHOLD_PENCE'] ?? '15');
+import { loadConfig, type Config } from './config.js';
+import { fetchRates, fetchConsumption } from './api.js';
+import { obtainKrakenToken, fetchDispatchSchedule, fetchSavingSessions } from './kraken.js';
+import { buildState, detectTransition } from './tariff.js';
+import type { TariffState, DispatchSlot, ConsumptionBatch } from './types.js';
 
 const TOPIC_TARIFF_STATE = 'helios/energy/tariff/state';
+const TOPIC_TARIFF_TRANSITION = 'helios/energy/octopus/tariff_transition';
+const TOPIC_DISPATCH_SCHEDULE = 'helios/energy/octopus/dispatch_schedule';
+const TOPIC_SAVING_SESSION = 'helios/energy/octopus/saving_session';
+const TOPIC_CONSUMPTION_IMPORT = 'helios/energy/octopus/consumption/import';
+const TOPIC_CONSUMPTION_EXPORT = 'helios/energy/octopus/consumption/export';
 
-// ── Rate processing ───────────────────────────────────────────────────────────
-
-function classifySlot(ratePence: number): 'cheap' | 'standard' {
-  return ratePence < CHEAP_THRESHOLD_PENCE ? 'cheap' : 'standard';
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function toSlots(rates: OctopusRateResult[]): TariffSlot[] {
-  return rates.map((r) => ({
-    start: r.valid_from,
-    end: r.valid_to,
-    type: classifySlot(r.value_inc_vat),
-    ratePenceIncVat: Math.round(r.value_inc_vat * 100) / 100,
-  }));
+function yesterdayStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
-function buildState(
-  importRates: OctopusRateResult[],
-  exportRatePence: number,
-): TariffState {
-  const now = Date.now();
-  const horizon = now + 48 * 60 * 60 * 1000; // 48 hours from now
-
-  // Find the currently active slot (valid_from <= now, and valid_to > now or null)
-  const active = importRates.find((r) => {
-    const from = new Date(r.valid_from).getTime();
-    const to = r.valid_to ? new Date(r.valid_to).getTime() : Infinity;
-    return from <= now && now < to;
-  });
-
-  const currentRate = active?.value_inc_vat ?? importRates[0]?.value_inc_vat ?? 0;
-
-  // Upcoming slots: valid_to is in the future and start is within 48h horizon
-  const upcomingSlots = importRates
-    .filter((r) => {
-      const to = r.valid_to ? new Date(r.valid_to).getTime() : Infinity;
-      const from = new Date(r.valid_from).getTime();
-      return to > now && from < horizon;
-    })
-    .sort((a, b) => new Date(a.valid_from).getTime() - new Date(b.valid_from).getTime());
-
-  return {
-    currentType: classifySlot(currentRate),
-    currentRatePenceIncVat: Math.round(currentRate * 100) / 100,
-    validTo: active?.valid_to ?? null,
-    exportRatePenceIncVat: Math.round(exportRatePence * 100) / 100,
-    slots: toSlots(upcomingSlots),
-    updatedAt: new Date().toISOString(),
-  };
+function isCurrentlyDispatched(slots: DispatchSlot[]): boolean {
+  const now = new Date().toISOString();
+  return slots.some((s) => s.start_utc <= now && s.end_utc > now);
 }
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 
 const run = async (): Promise<void> => {
-  console.log(`[octopus] connecting to MQTT at ${MQTT_URL}`);
-  const mqttClient = await mqtt.connectAsync(MQTT_URL, {
+  const config = await loadConfig();
+
+  console.log(`[octopus] connecting to MQTT at ${config.mqttUrl}`);
+  const mqttClient = await mqtt.connectAsync(config.mqttUrl, {
     clientId: `helios-adapter-octopus-${process.pid}`,
     clean: true,
     reconnectPeriod: 5000,
@@ -95,40 +58,202 @@ const run = async (): Promise<void> => {
   mqttClient.on('error', (err) => console.error('[octopus] MQTT error:', err));
   console.log('[octopus] MQTT connected');
 
-  // Fetch export rate once at startup — changes infrequently (monthly)
-  let exportRatePence = 0;
+  // ── Kraken token (non-fatal — degrades gracefully without Intelligent data) ──
+
+  let krakenToken: string | null = null;
   try {
-    const exportRate = await fetchExportRate(EXPORT_PRODUCT, EXPORT_TARIFF);
-    exportRatePence = exportRate?.value_inc_vat ?? 0;
-    console.log(`[octopus] export rate: ${exportRatePence}p/kWh`);
+    krakenToken = await obtainKrakenToken(config.apiKey);
+    console.log('[octopus] Kraken token obtained');
   } catch (err) {
-    console.error('[octopus] failed to fetch export rate:', err);
+    console.error('[octopus] Kraken token failed — dispatch schedule and saving sessions unavailable:', err);
   }
 
-  const poll = async (): Promise<void> => {
+  // ── State ─────────────────────────────────────────────────────────────────────
+
+  let prevState: TariffState | null = null;
+  let currentDispatch: DispatchSlot[] = [];
+  let exportRatePence = 0;
+
+  // Daily task tracking: store the date string for each task last run
+  const dailyRan: Record<string, string | null> = {
+    rateRefresh: null,
+    consumption: null,
+    savingSessions: null,
+    dispatch: null,
+  };
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  const publish = async (topic: string, payload: unknown, retain: boolean): Promise<void> => {
+    await mqttClient.publishAsync(topic, JSON.stringify(payload), { retain, qos: 1 });
+  };
+
+  const refreshExportRate = async (cfg: Config): Promise<void> => {
+    const rates = await fetchRates(cfg.exportProduct, cfg.exportTariff, 1);
+    exportRatePence = rates[0]?.value_inc_vat ?? exportRatePence;
+    console.log(`[octopus] export rate refreshed: ${exportRatePence}p/kWh`);
+  };
+
+  // ── Initial export rate ───────────────────────────────────────────────────────
+
+  try {
+    await refreshExportRate(config);
+  } catch (err) {
+    console.error('[octopus] initial export rate fetch failed:', err);
+  }
+
+  // ── Tariff poll ───────────────────────────────────────────────────────────────
+
+  const pollTariff = async (): Promise<void> => {
     try {
-      const importRates = await fetchImportRates(IMPORT_PRODUCT, IMPORT_TARIFF);
+      const importRates = await fetchRates(config.importProduct, config.importTariff);
       const state = buildState(importRates, exportRatePence);
 
-      await mqttClient.publishAsync(TOPIC_TARIFF_STATE, JSON.stringify(state), { retain: true, qos: 1 });
+      const transition = detectTransition(prevState, state);
+      if (transition) {
+        const event = { ...transition, dispatched: isCurrentlyDispatched(currentDispatch) };
+        await publish(TOPIC_TARIFF_TRANSITION, event, false);
+        console.log(`[octopus] transition: ${event.from_rate} → ${event.to_rate} dispatched=${event.dispatched}`);
+      }
 
+      await publish(TOPIC_TARIFF_STATE, state, true);
+      prevState = state;
       console.log(
-        `[octopus] published state: ${state.currentType} @ ${state.currentRatePenceIncVat}p/kWh` +
-        (state.validTo ? ` until ${state.validTo}` : '') +
-        `, export ${state.exportRatePenceIncVat}p/kWh, ${state.slots.length} upcoming slots`,
+        `[octopus] tariff: ${state.currentType} @ ${state.currentRatePenceIncVat}p` +
+        (state.validTo ? ` until ${new Date(state.validTo).toLocaleTimeString('en-GB')}` : '') +
+        ` | ${state.slots.length} upcoming slots`,
       );
     } catch (err) {
-      console.error('[octopus] poll error:', err);
+      console.error('[octopus] tariff poll error:', err);
     }
   };
 
-  // Initial poll then on interval
-  await poll();
-  const timer = setInterval(() => void poll(), POLL_INTERVAL_MS);
+  // ── Daily: dispatch schedule (20:00) ──────────────────────────────────────────
+
+  const runDispatchFetch = async (): Promise<void> => {
+    if (!krakenToken) return;
+    try {
+      const slots = await fetchDispatchSchedule(krakenToken, config.accountNumber);
+      currentDispatch = slots;
+      await publish(TOPIC_DISPATCH_SCHEDULE, {
+        account: config.accountNumber,
+        fetched_at: new Date().toISOString(),
+        slots,
+      }, true);
+      console.log(`[octopus] dispatch schedule: ${slots.length} planned slots`);
+    } catch (err) {
+      console.error('[octopus] dispatch schedule error:', err);
+      try {
+        krakenToken = await obtainKrakenToken(config.apiKey);
+        console.log('[octopus] Kraken token refreshed after error');
+      } catch { /* will retry at next scheduled run */ }
+    }
+  };
+
+  // ── Daily: saving sessions (09:00) ───────────────────────────────────────────
+
+  const runSavingSessions = async (): Promise<void> => {
+    if (!krakenToken) return;
+    try {
+      const { events } = await fetchSavingSessions(krakenToken, config.accountNumber);
+      const now = new Date().toISOString();
+      const active = events.filter((e) => e.start_at <= now && e.end_at > now);
+      await publish(TOPIC_SAVING_SESSION, { active: active.length > 0, events, fetched_at: now }, true);
+      console.log(`[octopus] saving sessions: ${events.length} events, ${active.length} active`);
+    } catch (err) {
+      console.error('[octopus] saving sessions error:', err);
+    }
+  };
+
+  // ── Daily: smart meter consumption (02:00) ────────────────────────────────────
+
+  const runConsumption = async (): Promise<void> => {
+    const date = yesterdayStr();
+    const from = `${date}T00:00:00Z`;
+    const to = `${date}T23:59:59Z`;
+
+    const fetchAndPublish = async (
+      mpan: string,
+      serial: string,
+      type: 'import' | 'export',
+      topic: string,
+    ): Promise<void> => {
+      const intervals = await fetchConsumption(config.apiKey, mpan, serial, from, to);
+      const batch: ConsumptionBatch = {
+        mpan,
+        type,
+        date,
+        fetched_at: new Date().toISOString(),
+        intervals,
+      };
+      await publish(topic, batch, true);
+      console.log(`[octopus] consumption ${type} ${date}: ${intervals.length} intervals`);
+    };
+
+    if (config.importMeterSerial) {
+      try {
+        await fetchAndPublish(config.importMpan, config.importMeterSerial, 'import', TOPIC_CONSUMPTION_IMPORT);
+      } catch (err) {
+        console.error('[octopus] import consumption error:', err);
+      }
+    }
+
+    if (config.exportMeterSerial) {
+      try {
+        await fetchAndPublish(config.exportMpan, config.exportMeterSerial, 'export', TOPIC_CONSUMPTION_EXPORT);
+      } catch (err) {
+        console.error('[octopus] export consumption error:', err);
+      }
+    }
+  };
+
+  // ── Daily: live rate refresh (05:00) ─────────────────────────────────────────
+
+  const runRateRefresh = async (): Promise<void> => {
+    try {
+      await refreshExportRate(config);
+    } catch (err) {
+      console.error('[octopus] rate refresh error:', err);
+    }
+  };
+
+  // ── Scheduler ─────────────────────────────────────────────────────────────────
+
+  const runDailyTasks = async (): Promise<void> => {
+    const hour = new Date().getHours();
+    const today = todayStr();
+
+    if (hour === 2 && dailyRan['consumption'] !== today) {
+      dailyRan['consumption'] = today;
+      await runConsumption();
+    }
+    if (hour === 5 && dailyRan['rateRefresh'] !== today) {
+      dailyRan['rateRefresh'] = today;
+      await runRateRefresh();
+    }
+    if (hour === 9 && dailyRan['savingSessions'] !== today) {
+      dailyRan['savingSessions'] = today;
+      await runSavingSessions();
+    }
+    if (hour === 20 && dailyRan['dispatch'] !== today) {
+      dailyRan['dispatch'] = today;
+      await runDispatchFetch();
+    }
+  };
+
+  // ── Startup ───────────────────────────────────────────────────────────────────
+
+  await pollTariff();
+  await runDispatchFetch();
+  await runSavingSessions();
+
+  const pollTimer = setInterval(() => void pollTariff(), config.pollIntervalMs);
+  const dailyTimer = setInterval(() => void runDailyTasks(), 60_000);
 
   const shutdown = (): void => {
     console.log('[octopus] shutting down');
-    clearInterval(timer);
+    clearInterval(pollTimer);
+    clearInterval(dailyTimer);
     void mqttClient.endAsync();
     process.exit(0);
   };
