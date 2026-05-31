@@ -72,10 +72,15 @@ services:
     depends_on: [mosquitto]
     environment:
       MQTT_URL: mqtt://octopus:${MQTT_PASSWORD_OCTOPUS}@mosquitto:1883
+      OCTOPUS_ACCOUNT: A-B240C957
+      OCTOPUS_IMPORT_MPAN: "1013041723586"
+      OCTOPUS_EXPORT_MPAN: "1050003544656"
       OCTOPUS_IMPORT_PRODUCT: INTELLI-VAR-24-10-29
       OCTOPUS_IMPORT_TARIFF: E-1R-INTELLI-VAR-24-10-29-A
       OCTOPUS_EXPORT_PRODUCT: OUTGOING-VAR-24-10-26
       OCTOPUS_EXPORT_TARIFF: E-1R-OUTGOING-VAR-24-10-26-A
+    secrets:
+      - octopus_api_key
 
   # adapter-hue:
   #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:-latest}
@@ -166,6 +171,8 @@ secrets:
     file: ./secrets/authelia_storage_key.txt
   grafana_admin_password:
     file: ./secrets/grafana_admin_password.txt
+  octopus_api_key:
+    file: ./secrets/octopus_api_key.txt
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
 
