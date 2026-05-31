@@ -15,3 +15,31 @@ export interface TariffState {
   slots: TariffSlot[];
   updatedAt: string;
 }
+
+export interface DispatchSlot {
+  start_utc: string;
+  end_utc: string;
+  delta_kwh: number;
+  source: string;
+}
+
+export interface DispatchSchedule {
+  account: string;
+  fetched_at: string;
+  slots: DispatchSlot[];
+}
+
+export interface SavingSessionEvent {
+  id: string;
+  start_at: string;
+  end_at: string;
+  duration_minutes: number;
+  reward_octopoints_per_kwh: number;
+  joined: boolean;
+}
+
+export interface SavingSessionState {
+  active: boolean;
+  events: SavingSessionEvent[];
+  fetched_at: string;
+}

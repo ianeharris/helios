@@ -1,5 +1,7 @@
 import { useTariff } from '../hooks/useTariff.js';
-import type { TariffSlot } from '@helios/shared';
+import { useDispatch } from '../hooks/useDispatch.js';
+import { useSavingSessions } from '../hooks/useSavingSessions.js';
+import type { TariffSlot, DispatchSlot } from '@helios/shared';
 
 const fmtTime = (iso: string): string =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -40,12 +42,55 @@ const SlotRow = ({ slot }: { slot: TariffSlot }): JSX.Element => {
   );
 };
 
+const DispatchRow = ({ slot }: { slot: DispatchSlot }): JSX.Element => {
+  const now = new Date().toISOString();
+  const isActive = slot.start_utc <= now && slot.end_utc > now;
+
+  return (
+    <div className={`flex items-center justify-between px-4 py-3 ${isActive ? 'bg-slate-700' : 'bg-slate-800'} rounded-lg`}>
+      <div className="space-y-0.5">
+        <p className="text-xs text-slate-400">{fmtDate(slot.start_utc)}</p>
+        <p className="text-sm text-slate-200">
+          {fmtTime(slot.start_utc)} – {fmtTime(slot.end_utc)}
+        </p>
+      </div>
+      <div className="text-right space-y-0.5">
+        <p className="text-sm font-semibold text-blue-400">4.95p</p>
+        <p className="text-xs uppercase tracking-wide text-blue-600">
+          dispatched
+          {isActive && <span className="ml-1 text-amber-400">● now</span>}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 export const Energy = (): JSX.Element => {
-  const { tariff, status } = useTariff();
+  const { tariff, status: tariffStatus } = useTariff();
+  const { dispatch } = useDispatch();
+  const { sessions } = useSavingSessions();
+
+  const activeSession = sessions?.active ? sessions.events.find((e) => {
+    const now = new Date().toISOString();
+    return e.start_at <= now && e.end_at > now;
+  }) : null;
+
+  const upcomingSessions = sessions?.events.filter((e) => new Date(e.start_at) > new Date()) ?? [];
 
   return (
     <div className="p-4 space-y-6">
       <h1 className="text-xl font-semibold text-slate-100">Energy</h1>
+
+      {/* Saving Session active banner */}
+      {activeSession && (
+        <div className="bg-emerald-900 border border-emerald-600 rounded-xl px-4 py-3 space-y-1">
+          <p className="text-sm font-semibold text-emerald-300">⚡ Saving Session active</p>
+          <p className="text-xs text-emerald-400">
+            Until {fmtTime(activeSession.end_at)} · {activeSession.reward_octopoints_per_kwh} pts/kWh
+          </p>
+          <p className="text-xs text-emerald-600">Reduce consumption to earn Octopoints</p>
+        </div>
+      )}
 
       {/* Live meters — Phase 2 (Fox ESS) */}
       <div className="grid grid-cols-2 gap-3">
@@ -62,19 +107,52 @@ export const Energy = (): JSX.Element => {
         ))}
       </div>
 
-      {/* Tariff slots */}
+      {/* Intelligent dispatch schedule */}
+      {dispatch && dispatch.slots.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Intelligent dispatch</h2>
+          {dispatch.slots.map((slot, i) => (
+            <DispatchRow key={i} slot={slot} />
+          ))}
+        </div>
+      )}
+
+      {/* Tariff rate schedule */}
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Rate schedule</h2>
-        {status === 'loading' && (
+        {tariffStatus === 'loading' && (
           <p className="text-sm text-slate-500">Loading tariff data…</p>
         )}
-        {status === 'error' && (
+        {tariffStatus === 'error' && (
           <p className="text-sm text-red-400">Could not load tariff data.</p>
         )}
         {tariff?.slots.map((slot, i) => (
           <SlotRow key={i} slot={slot} />
         ))}
       </div>
+
+      {/* Upcoming saving sessions */}
+      {upcomingSessions.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Saving Sessions</h2>
+          {upcomingSessions.map((event) => (
+            <div key={event.id} className="bg-slate-800 rounded-lg px-4 py-3 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs text-slate-400">{fmtDate(event.start_at)}</p>
+                <p className="text-sm text-slate-200">
+                  {fmtTime(event.start_at)} · {event.duration_minutes} min
+                </p>
+              </div>
+              <div className="text-right space-y-0.5">
+                <p className="text-sm font-semibold text-emerald-400">{event.reward_octopoints_per_kwh} pts/kWh</p>
+                <p className={`text-xs ${event.joined ? 'text-emerald-600' : 'text-slate-600'}`}>
+                  {event.joined ? '✓ joined' : 'not joined'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tariff && (
         <p className="text-xs text-slate-600 text-center">
