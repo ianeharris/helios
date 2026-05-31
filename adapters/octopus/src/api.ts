@@ -28,7 +28,10 @@ export async function fetchRates(product: string, tariff: string, pageSize = 20)
   return data.results;
 }
 
-export async function fetchAccountDetails(apiKey: string, accountNumber: string) {
+export async function fetchAccountDetails(
+  apiKey: string,
+  accountNumber: string,
+): Promise<z.infer<typeof AccountSchema>> {
   return get(`${BASE}/accounts/${accountNumber}/`, AccountSchema, apiKey);
 }
 
@@ -45,7 +48,7 @@ export async function fetchConsumption(
     page_size: '100',
     order_by: 'period',
   });
-  const url = `${BASE}/electricity-meter-points/${mpan}/meters/${serial}/consumption/?${params}`;
+  const url = `${BASE}/electricity-meter-points/${mpan}/meters/${serial}/consumption/?${params.toString()}`;
   const data = await get(url, OctopusConsumptionResponseSchema, apiKey);
   return data.results.map((r) => ({
     start: r.interval_start,
