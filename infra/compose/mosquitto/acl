@@ -3,7 +3,7 @@
 # access: read=1, write=2, readwrite=4
 
 user octopus
-topic write helios/energy/tariff/state
+topic write helios/energy/#
 
 user hue
 topic write helios/lights/#
