@@ -6,8 +6,9 @@ const BASE_URL = 'https://www.foxesscloud.com';
 
 const REAL_TIME_VARIABLES = [
   'pvPower',
-  'batSoc',
-  'batPower',
+  'SoC',            // battery state of charge — Fox ESS uses capital SoC, not batSoc
+  'batChargePower',
+  'batDischargePower',
   'gridConsumptionPower',
   'feedinPower',
   'loadsPower',
@@ -93,8 +94,8 @@ export async function fetchRealTime(apiKey: string, deviceSN: string): Promise<R
 
   return {
     pvPower: byVar['pvPower'] ?? 0,
-    batSoc: byVar['batSoc'] ?? 0,
-    batPower: byVar['batPower'] ?? 0,
+    batSoc: byVar['SoC'] ?? 0,
+    batPower: (byVar['batChargePower'] ?? 0) - (byVar['batDischargePower'] ?? 0),
     gridConsumptionPower: byVar['gridConsumptionPower'] ?? 0,
     feedinPower: byVar['feedinPower'] ?? 0,
     loadsPower: byVar['loadsPower'] ?? 0,
