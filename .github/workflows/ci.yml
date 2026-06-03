@@ -79,7 +79,7 @@ jobs:
   build-images:
     name: Build & push images
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     # Only push on main; PRs build only (no push)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [lint-typecheck, test]
