@@ -26,7 +26,11 @@ export const RealDataResultSchema = z.object({
   datas: z.array(RealDataVariableSchema),
 });
 
-export function foxResponse<T extends z.ZodTypeAny>(resultSchema: T) {
+export function foxResponse<T extends z.ZodTypeAny>(resultSchema: T): z.ZodObject<{
+  errno: z.ZodNumber;
+  msg: z.ZodOptional<z.ZodString>;
+  result: z.ZodOptional<T>;
+}> {
   return z.object({
     errno: z.number(),
     msg: z.string().optional(),

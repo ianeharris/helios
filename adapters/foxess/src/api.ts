@@ -43,7 +43,7 @@ async function foxRequest<T>(
     throw new Error(`Fox ESS HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
 
-  const json = await res.json() as unknown;
+  const json: unknown = await res.json();
   const wrapper = foxResponse(schema).parse(json);
   if (wrapper.errno !== 0) {
     throw new Error(`Fox ESS API error ${wrapper.errno}: ${wrapper.msg ?? 'unknown'}`);
