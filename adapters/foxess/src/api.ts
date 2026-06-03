@@ -82,8 +82,11 @@ export async function fetchRealTime(apiKey: string, deviceSN: string): Promise<R
     RealDataResultSchema,
   );
 
+  const item = result[0];
+  if (!item) throw new Error('Fox ESS real/query returned empty array');
+
   const byVar: Record<string, number> = {};
-  for (const d of result.datas) {
+  for (const d of item.datas) {
     const val = typeof d.value === 'number' ? d.value : parseFloat(String(d.value ?? '0'));
     byVar[d.variable] = isNaN(val) ? 0 : val;
   }

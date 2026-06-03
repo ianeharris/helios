@@ -20,11 +20,13 @@ export const RealDataVariableSchema = z.object({
   value: z.union([z.number(), z.string(), z.null()]).optional(),
 });
 
-export const RealDataResultSchema = z.object({
+export const RealDataItemSchema = z.object({
   time: z.string().optional(),
   deviceSN: z.string().optional(),
   datas: z.array(RealDataVariableSchema),
 });
+
+export const RealDataResultSchema = z.array(RealDataItemSchema);
 
 export function foxResponse<T extends z.ZodTypeAny>(resultSchema: T): z.ZodObject<{
   errno: z.ZodNumber;
