@@ -1,8 +1,15 @@
+import { useState } from 'react';
+import {
+  ResponsiveContainer, AreaChart, Area, LineChart, Line,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
 import { useTariff } from '../hooks/useTariff.js';
 import { useDispatch } from '../hooks/useDispatch.js';
 import { useSavingSessions } from '../hooks/useSavingSessions.js';
 import { useFoxEss } from '../hooks/useFoxEss.js';
-import type { TariffSlot, DispatchSlot } from '@helios/shared';
+import { useEnergyHistory } from '../hooks/useEnergyHistory.js';
+import { FlowDiagram } from '../components/FlowDiagram.js';
+import type { TariffSlot, DispatchSlot, EnergyPeriod } from '@helios/shared';
 
 const fmtTime = (iso: string): string =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -15,6 +22,13 @@ const fmtDate = (iso: string): string => {
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+};
+
+const fmtChartTime = (iso: string, period: EnergyPeriod): string => {
+  const d = new Date(iso);
+  if (period === 'day') return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (period === 'week') return d.toLocaleDateString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
 const SlotRow = ({ slot }: { slot: TariffSlot }): JSX.Element => {
@@ -66,6 +80,100 @@ const DispatchRow = ({ slot }: { slot: DispatchSlot }): JSX.Element => {
   );
 };
 
+const PERIODS: { label: string; value: EnergyPeriod }[] = [
+  { label: 'Day', value: 'day' },
+  { label: 'Week', value: 'week' },
+  { label: 'Month', value: 'month' },
+];
+
+const HistoryCharts = (): JSX.Element => {
+  const [period, setPeriod] = useState<EnergyPeriod>('day');
+  const { history, status } = useEnergyHistory(period);
+
+  const data = history?.points.map((p) => ({
+    time: fmtChartTime(p.time, period),
+    'Solar (W)': p.pvWatts !== null ? Math.round(p.pvWatts) : null,
+    'Home (W)': p.loadWatts !== null ? Math.round(p.loadWatts) : null,
+    'Grid (W)': p.gridWatts !== null ? Math.round(p.gridWatts) : null,
+    'Battery %': p.battSocPct !== null ? Math.round(p.battSocPct) : null,
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">History</h2>
+        <div className="flex gap-1">
+          {PERIODS.map(({ label, value }) => (
+            <button
+              key={value}
+              onClick={() => setPeriod(value)}
+              className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                period === value
+                  ? 'bg-slate-600 text-slate-100'
+                  : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {status === 'loading' && (
+        <p className="text-sm text-slate-500 text-center py-8">Loading…</p>
+      )}
+      {status === 'error' && (
+        <p className="text-sm text-red-400 text-center py-4">Could not load history.</p>
+      )}
+      {status === 'ok' && data && data.length === 0 && (
+        <p className="text-sm text-slate-500 text-center py-8">No data yet — readings will appear here after the first poll cycle.</p>
+      )}
+
+      {status === 'ok' && data && data.length > 0 && (
+        <>
+          {/* Power chart */}
+          <div>
+            <p className="text-xs text-slate-500 mb-2">Power (W)</p>
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#94a3b8', fontSize: 11 }}
+                  itemStyle={{ fontSize: 12 }}
+                />
+                <Area type="monotone" dataKey="Solar (W)" stroke="#fbbf24" fill="#fbbf2420" strokeWidth={1.5} dot={false} connectNulls />
+                <Area type="monotone" dataKey="Home (W)" stroke="#e2e8f0" fill="#e2e8f010" strokeWidth={1.5} dot={false} connectNulls />
+                <Area type="monotone" dataKey="Grid (W)" stroke="#94a3b8" fill="#94a3b810" strokeWidth={1.5} dot={false} connectNulls />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Battery SoC chart */}
+          <div>
+            <p className="text-xs text-slate-500 mb-2">Battery (%)</p>
+            <ResponsiveContainer width="100%" height={120}>
+              <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#94a3b8', fontSize: 11 }}
+                  itemStyle={{ fontSize: 12 }}
+                />
+                <Line type="monotone" dataKey="Battery %" stroke="#34d399" strokeWidth={1.5} dot={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const Energy = (): JSX.Element => {
   const { tariff, status: tariffStatus } = useTariff();
   const { dispatch } = useDispatch();
@@ -94,6 +202,13 @@ export const Energy = (): JSX.Element => {
         </div>
       )}
 
+      {/* Live flow diagram */}
+      {live && (
+        <div className="bg-slate-900 rounded-xl p-3">
+          <FlowDiagram live={live} />
+        </div>
+      )}
+
       {/* Live meters — Fox ESS */}
       <div className="grid grid-cols-2 gap-3">
         {[
@@ -108,6 +223,9 @@ export const Energy = (): JSX.Element => {
           </div>
         ))}
       </div>
+
+      {/* History charts */}
+      <HistoryCharts />
 
       {/* Intelligent dispatch schedule */}
       {dispatch && dispatch.slots.length > 0 && (
