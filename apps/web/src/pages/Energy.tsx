@@ -119,7 +119,7 @@ export const Energy = (): JSX.Element => {
         </div>
       )}
 
-      {/* Tariff rate schedule */}
+      {/* Tariff rate schedule — upcoming slots only, within next 24 h */}
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Rate schedule</h2>
         {tariffStatus === 'loading' && (
@@ -128,9 +128,16 @@ export const Energy = (): JSX.Element => {
         {tariffStatus === 'error' && (
           <p className="text-sm text-red-400">Could not load tariff data.</p>
         )}
-        {tariff?.slots.map((slot, i) => (
-          <SlotRow key={i} slot={slot} />
-        ))}
+        {tariff?.slots
+          .filter((slot) => {
+            const now = Date.now();
+            const end = slot.end ? new Date(slot.end).getTime() : Infinity;
+            const start = new Date(slot.start).getTime();
+            return end > now && start < now + 24 * 60 * 60 * 1000;
+          })
+          .map((slot, i) => (
+            <SlotRow key={i} slot={slot} />
+          ))}
       </div>
 
       {/* Upcoming saving sessions */}

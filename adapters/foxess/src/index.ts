@@ -14,7 +14,7 @@ import { fetchDeviceSN, fetchRealTime } from './api.js';
 import type { FoxEssLive } from '@helios/shared';
 
 const TOPIC_LIVE = 'helios/energy/foxess/live';
-const POLL_INTERVAL_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 60 * 1000; // 1 min — Fox ESS API rate limit is 1440/day
 
 function loadApiKey(): string {
   try {
