@@ -14,8 +14,9 @@ const REAL_TIME_VARIABLES = [
 ];
 
 function sign(apiKey: string, timestamp: string, path: string): string {
+  // Fox ESS requires literal \r\n (4 chars), not CR+LF, in the order: path, token, timestamp
   return createHash('md5')
-    .update(`${apiKey}\r\n${timestamp}\r\n${path}`)
+    .update(`${path}\\r\\n${apiKey}\\r\\n${timestamp}`)
     .digest('hex');
 }
 
