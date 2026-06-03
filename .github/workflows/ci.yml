@@ -184,5 +184,5 @@ jobs:
             HELIOS_VERSION=$GITHUB_SHA HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh
             cd infra/compose
             HELIOS_VERSION=$GITHUB_SHA docker compose pull
-            HELIOS_VERSION=$GITHUB_SHA docker compose up -d
+            HELIOS_VERSION=$GITHUB_SHA docker compose up -d --force-recreate
             docker compose ps
