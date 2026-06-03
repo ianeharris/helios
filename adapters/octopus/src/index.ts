@@ -171,6 +171,11 @@ const run = async (): Promise<void> => {
       console.log(`[octopus] saving sessions: ${events.length} events, ${active.length} active`);
     } catch (err) {
       console.error('[octopus] saving sessions error:', err);
+      try {
+        krakenToken = await obtainKrakenToken(config.apiKey);
+        krakenDeviceIds = await fetchDeviceIds(krakenToken, config.accountNumber);
+        console.log('[octopus] Kraken token refreshed after error');
+      } catch { /* will retry at next scheduled run */ }
     }
   };
 
