@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { DeviceListResultSchema, RealDataResultSchema, foxResponse } from './types.js';
 import type { z } from 'zod';
 
-const BASE_URL = 'https://openapi.fox-ess.com';
+const BASE_URL = 'https://www.foxesscloud.com';
 
 const REAL_TIME_VARIABLES = [
   'pvPower',
