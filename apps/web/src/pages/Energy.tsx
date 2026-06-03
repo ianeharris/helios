@@ -1,6 +1,7 @@
 import { useTariff } from '../hooks/useTariff.js';
 import { useDispatch } from '../hooks/useDispatch.js';
 import { useSavingSessions } from '../hooks/useSavingSessions.js';
+import { useFoxEss } from '../hooks/useFoxEss.js';
 import type { TariffSlot, DispatchSlot } from '@helios/shared';
 
 const fmtTime = (iso: string): string =>
@@ -69,6 +70,7 @@ export const Energy = (): JSX.Element => {
   const { tariff, status: tariffStatus } = useTariff();
   const { dispatch } = useDispatch();
   const { sessions } = useSavingSessions();
+  const { live } = useFoxEss();
 
   const activeSession = sessions?.active ? sessions.events.find((e) => {
     const now = new Date().toISOString();
@@ -92,12 +94,12 @@ export const Energy = (): JSX.Element => {
         </div>
       )}
 
-      {/* Live meters — Phase 2 (Fox ESS) */}
+      {/* Live meters — Fox ESS */}
       <div className="grid grid-cols-2 gap-3">
         {[
-          { label: 'Solar', value: '--', unit: 'W', color: 'text-amber-400' },
-          { label: 'Battery', value: '--', unit: '%', color: 'text-emerald-400' },
-          { label: 'Grid', value: '--', unit: 'kW', color: 'text-slate-400' },
+          { label: 'Solar', value: live ? Math.round(live.pvPower * 1000).toString() : '--', unit: 'W', color: 'text-amber-400' },
+          { label: 'Battery', value: live ? Math.round(live.batSoc).toString() : '--', unit: '%', color: 'text-emerald-400' },
+          { label: 'Grid', value: live ? live.gridPower.toFixed(1) : '--', unit: 'kW', color: live && live.gridPower < 0 ? 'text-emerald-400' : 'text-slate-400' },
           { label: 'Export', value: `${tariff?.exportRatePenceIncVat ?? '--'}`, unit: 'p/kWh', color: 'text-emerald-400' },
         ].map(({ label, value, unit, color }) => (
           <div key={label} className="bg-slate-800 rounded-xl p-3 space-y-1">

@@ -82,6 +82,15 @@ services:
     secrets:
       - octopus_api_key
 
+  adapter-foxess:
+    image: ghcr.io/ianeharris/helios-adapter-foxess:${HELIOS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on: [mosquitto]
+    environment:
+      MQTT_URL: mqtt://foxess:${MQTT_PASSWORD_FOXESS}@mosquitto:1883
+    secrets:
+      - foxess_api_key
+
   # adapter-hue:
   #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:-latest}
   #   restart: unless-stopped
@@ -173,6 +182,8 @@ secrets:
     file: ./secrets/grafana_admin_password.txt
   octopus_api_key:
     file: ./secrets/octopus_api_key.txt
+  foxess_api_key:
+    file: ./secrets/foxess_api_key.txt
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
 

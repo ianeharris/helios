@@ -6,6 +6,7 @@ const RETAINED_TOPICS = [
   'helios/energy/tariff/state',
   'helios/energy/octopus/dispatch_schedule',
   'helios/energy/octopus/saving_session',
+  'helios/energy/foxess/live',
 ];
 
 let client: mqtt.MqttClient | null = null;

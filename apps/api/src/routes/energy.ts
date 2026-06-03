@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { mqttGet } from '../mqtt/cache.js';
-import type { TariffState, DispatchSchedule, SavingSessionState } from '@helios/shared';
+import type { TariffState, DispatchSchedule, SavingSessionState, FoxEssLive } from '@helios/shared';
 
 export const energyRoutes = (app: FastifyInstance, _opts: unknown, done: () => void): void => {
   app.get('/energy/tariff', (_req, reply) => {
@@ -18,6 +18,12 @@ export const energyRoutes = (app: FastifyInstance, _opts: unknown, done: () => v
   app.get('/energy/saving-sessions', (_req, reply) => {
     const state = mqttGet<SavingSessionState>('helios/energy/octopus/saving_session');
     if (!state) return reply.status(503).send({ error: 'saving session data not yet available' });
+    return reply.send(state);
+  });
+
+  app.get('/energy/foxess', (_req, reply) => {
+    const state = mqttGet<FoxEssLive>('helios/energy/foxess/live');
+    if (!state) return reply.status(503).send({ error: 'Fox ESS data not yet available' });
     return reply.send(state);
   });
 

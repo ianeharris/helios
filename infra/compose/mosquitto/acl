@@ -18,9 +18,7 @@ topic read helios/#
 topic write helios/+/command
 
 user foxess
-topic write helios/energy/solar/#
-topic write helios/energy/battery/#
-topic write helios/energy/grid/#
+topic write helios/energy/foxess/#
 
 user hikvision
 topic write helios/security/cameras/#
