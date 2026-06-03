@@ -61,7 +61,7 @@ chmod 600 "$SCRIPT_DIR/../compose/.env"
 for user in octopus hue sonos api foxess hikvision texecom hive; do
   pass=$(sops --decrypt --extract "[\"mqtt_password_${user}\"]" "$SOPS_FILE" 2>/dev/null || true)
   if [[ -n "$pass" ]]; then
-    printf 'MQTT_PASSWORD_%s=%s\n' "${user^^}" "$pass" >> "$SCRIPT_DIR/../compose/.env"
+    printf 'MQTT_PASSWORD_%s=%s\n' "$(echo "$user" | tr '[:lower:]' '[:upper:]')" "$pass" >> "$SCRIPT_DIR/../compose/.env"
   fi
 done
 
