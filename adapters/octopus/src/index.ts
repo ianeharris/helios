@@ -20,7 +20,7 @@
 import mqtt from 'mqtt';
 import { loadConfig, type Config } from './config.js';
 import { fetchRates, fetchConsumption } from './api.js';
-import { obtainKrakenToken, fetchDispatchSchedule, fetchSavingSessions } from './kraken.js';
+import { obtainKrakenToken, fetchDeviceIds, fetchDispatchSchedule, fetchSavingSessions } from './kraken.js';
 import { buildState, detectTransition } from './tariff.js';
 import type { TariffState, DispatchSlot, ConsumptionBatch } from './types.js';
 
@@ -61,9 +61,12 @@ const run = async (): Promise<void> => {
   // ── Kraken token (non-fatal — degrades gracefully without Intelligent data) ──
 
   let krakenToken: string | null = null;
+  let krakenDeviceIds: string[] = [];
   try {
     krakenToken = await obtainKrakenToken(config.apiKey);
     console.log('[octopus] Kraken token obtained');
+    krakenDeviceIds = await fetchDeviceIds(krakenToken, config.accountNumber);
+    console.log(`[octopus] ${krakenDeviceIds.length} Kraken device(s): ${krakenDeviceIds.join(', ')}`);
   } catch (err) {
     console.error('[octopus] Kraken token failed — dispatch schedule and saving sessions unavailable:', err);
   }
@@ -131,20 +134,26 @@ const run = async (): Promise<void> => {
   // ── Daily: dispatch schedule (20:00) ──────────────────────────────────────────
 
   const runDispatchFetch = async (): Promise<void> => {
-    if (!krakenToken) return;
+    if (!krakenToken || krakenDeviceIds.length === 0) return;
     try {
-      const slots = await fetchDispatchSchedule(krakenToken, config.accountNumber);
-      currentDispatch = slots;
+      const allSlots: DispatchSlot[] = [];
+      for (const deviceId of krakenDeviceIds) {
+        const slots = await fetchDispatchSchedule(krakenToken, deviceId);
+        allSlots.push(...slots);
+      }
+      allSlots.sort((a, b) => a.start_utc.localeCompare(b.start_utc));
+      currentDispatch = allSlots;
       await publish(TOPIC_DISPATCH_SCHEDULE, {
         account: config.accountNumber,
         fetched_at: new Date().toISOString(),
-        slots,
+        slots: allSlots,
       }, true);
-      console.log(`[octopus] dispatch schedule: ${slots.length} planned slots`);
+      console.log(`[octopus] dispatch schedule: ${allSlots.length} planned slots`);
     } catch (err) {
       console.error('[octopus] dispatch schedule error:', err);
       try {
         krakenToken = await obtainKrakenToken(config.apiKey);
+        krakenDeviceIds = await fetchDeviceIds(krakenToken, config.accountNumber);
         console.log('[octopus] Kraken token refreshed after error');
       } catch { /* will retry at next scheduled run */ }
     }
@@ -155,7 +164,7 @@ const run = async (): Promise<void> => {
   const runSavingSessions = async (): Promise<void> => {
     if (!krakenToken) return;
     try {
-      const { events } = await fetchSavingSessions(krakenToken, config.accountNumber);
+      const { events } = await fetchSavingSessions(krakenToken, config.accountNumber, config.importMpan);
       const now = new Date().toISOString();
       const active = events.filter((e) => e.start_at <= now && e.end_at > now);
       await publish(TOPIC_SAVING_SESSION, { active: active.length > 0, events, fetched_at: now }, true);

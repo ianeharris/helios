@@ -86,7 +86,7 @@ export const Energy = (): JSX.Element => {
         <div className="bg-emerald-900 border border-emerald-600 rounded-xl px-4 py-3 space-y-1">
           <p className="text-sm font-semibold text-emerald-300">⚡ Saving Session active</p>
           <p className="text-xs text-emerald-400">
-            Until {fmtTime(activeSession.end_at)} · {activeSession.reward_octopoints_per_kwh} pts/kWh
+            Until {fmtTime(activeSession.end_at)} · {activeSession.name}
           </p>
           <p className="text-xs text-emerald-600">Reduce consumption to earn Octopoints</p>
         </div>
@@ -140,11 +140,11 @@ export const Energy = (): JSX.Element => {
               <div className="space-y-0.5">
                 <p className="text-xs text-slate-400">{fmtDate(event.start_at)}</p>
                 <p className="text-sm text-slate-200">
-                  {fmtTime(event.start_at)} · {event.duration_minutes} min
+                  {fmtTime(event.start_at)} – {fmtTime(event.end_at)}
                 </p>
+                <p className="text-xs text-slate-400">{event.name}</p>
               </div>
               <div className="text-right space-y-0.5">
-                <p className="text-sm font-semibold text-emerald-400">{event.reward_octopoints_per_kwh} pts/kWh</p>
                 <p className={`text-xs ${event.joined ? 'text-emerald-600' : 'text-slate-600'}`}>
                   {event.joined ? '✓ joined' : 'not joined'}
                 </p>

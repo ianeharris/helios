@@ -11,7 +11,10 @@ async function gql<T>(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `JWT ${token}`;
   const res = await fetch(KRAKEN_URL, { method: 'POST', headers, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`Kraken HTTP ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Kraken HTTP ${res.status} ${res.statusText}: ${text.slice(0, 300)}`);
+  }
   const json = await res.json() as { data?: unknown; errors?: { message: string }[] };
   if (json.errors?.length) throw new Error(`Kraken GraphQL: ${json.errors.map((e) => e.message).join(', ')}`);
   return schema.parse(json.data);
@@ -31,84 +34,96 @@ export async function obtainKrakenToken(apiKey: string): Promise<string> {
   return data.obtainKrakenToken.token;
 }
 
+// ── Devices ───────────────────────────────────────────────────────────────────
+
+const DevicesSchema = z.object({
+  devices: z.array(z.object({ id: z.string(), name: z.string().nullable() })),
+});
+
+export async function fetchDeviceIds(token: string, accountNumber: string): Promise<string[]> {
+  const data = await gql(
+    { query: `{ devices(accountNumber: "${accountNumber}") { id name } }` },
+    DevicesSchema,
+    token,
+  );
+  return data.devices.map((d) => d.id);
+}
+
 // ── Dispatch schedule ─────────────────────────────────────────────────────────
 
-const PlannedDispatchSchema = z.object({
-  plannedDispatches: z.array(
+const FlexDispatchSchema = z.object({
+  flexPlannedDispatches: z.array(
     z.object({
-      startDt: z.string(),
-      endDt: z.string(),
-      deltaKwh: z.number().nullable().optional(),
-      meta: z
-        .object({
-          source: z.string().optional(),
-          location: z.string().optional(),
-        })
-        .optional(),
+      start: z.string(),
+      end: z.string(),
+      type: z.string().nullable().optional(),
+      energyAddedKwh: z.string().nullable().optional(),
     }),
   ),
 });
 
 export async function fetchDispatchSchedule(
   token: string,
-  accountNumber: string,
+  deviceId: string,
 ): Promise<DispatchSlot[]> {
   const query = `{
-    plannedDispatches(accountNumber: "${accountNumber}") {
-      startDt endDt deltaKwh meta { source location }
+    flexPlannedDispatches(deviceId: "${deviceId}") {
+      start end type energyAddedKwh
     }
   }`;
-  const data = await gql({ query }, PlannedDispatchSchema, token);
-  return data.plannedDispatches.map((d) => ({
-    start_utc: d.startDt,
-    end_utc: d.endDt,
-    delta_kwh: d.deltaKwh ?? 0,
-    source: d.meta?.source ?? 'octopus',
+  const data = await gql({ query }, FlexDispatchSchema, token);
+  return data.flexPlannedDispatches.map((d) => ({
+    start_utc: d.start,
+    end_utc: d.end,
+    delta_kwh: parseFloat(d.energyAddedKwh ?? '0') || 0,
+    source: d.type ?? 'smart-flex',
   }));
 }
 
-// ── Saving sessions ───────────────────────────────────────────────────────────
+// ── Saving sessions (Customer Flexibility Campaign Events) ────────────────────
 
-const SavingSessionsSchema = z.object({
-  savingSessions: z.object({
-    hasJoinedCampaign: z.boolean().optional(),
-    events: z.array(
+const CampaignEventsSchema = z.object({
+  customerFlexibilityCampaignEvents: z.object({
+    edges: z.array(
       z.object({
-        id: z.string(),
-        startAt: z.string(),
-        endAt: z.string(),
-        durationInMinutes: z.number(),
-        rewardPerKwhInOctoPoints: z.number().optional(),
+        node: z.object({
+          name: z.string(),
+          code: z.string(),
+          startAt: z.string(),
+          endAt: z.string(),
+          isEventParticipant: z.boolean(),
+        }),
       }),
     ),
-    joinedEvents: z
-      .array(z.object({ eventId: z.string().optional(), id: z.string().optional() }))
-      .optional(),
   }),
 });
+
+const SAVING_SESSIONS_SLUG = 'saving-sessions';
 
 export async function fetchSavingSessions(
   token: string,
   accountNumber: string,
+  mpan: string,
 ): Promise<{ events: SavingSessionEvent[] }> {
   const query = `{
-    savingSessions(accountNumber: "${accountNumber}") {
-      hasJoinedCampaign
-      events { id startAt endAt durationInMinutes rewardPerKwhInOctoPoints }
-      joinedEvents { eventId }
+    customerFlexibilityCampaignEvents(
+      accountNumber: "${accountNumber}"
+      supplyPointIdentifier: "${mpan}"
+      campaignSlug: "${SAVING_SESSIONS_SLUG}"
+      first: 20
+    ) {
+      edges {
+        node { name code startAt endAt isEventParticipant }
+      }
     }
   }`;
-  const data = await gql({ query }, SavingSessionsSchema, token);
-  const joined = new Set(
-    (data.savingSessions.joinedEvents ?? []).map((e) => e.eventId ?? e.id ?? ''),
-  );
-  const events: SavingSessionEvent[] = data.savingSessions.events.map((e) => ({
-    id: e.id,
-    start_at: e.startAt,
-    end_at: e.endAt,
-    duration_minutes: e.durationInMinutes,
-    reward_octopoints_per_kwh: e.rewardPerKwhInOctoPoints ?? 0,
-    joined: joined.has(e.id),
+  const data = await gql({ query }, CampaignEventsSchema, token);
+  const events: SavingSessionEvent[] = data.customerFlexibilityCampaignEvents.edges.map((e) => ({
+    id: e.node.code,
+    name: e.node.name,
+    start_at: e.node.startAt,
+    end_at: e.node.endAt,
+    joined: e.node.isEventParticipant,
   }));
   return { events };
 }

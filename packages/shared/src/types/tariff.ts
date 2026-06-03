@@ -30,12 +30,11 @@ export interface DispatchSchedule {
 }
 
 export interface SavingSessionEvent {
-  id: string;
+  id: string;       // event code
+  name: string;
   start_at: string;
   end_at: string;
-  duration_minutes: number;
-  reward_octopoints_per_kwh: number;
-  joined: boolean;
+  joined: boolean;  // isEventParticipant
 }
 
 export interface SavingSessionState {
