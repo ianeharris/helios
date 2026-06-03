@@ -175,7 +175,10 @@ jobs:
           envs: GHCR_TOKEN,GITHUB_ACTOR,GITHUB_SHA
           script: |
             export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            mkdir -p ~/.docker
+            printf '{"auths":{"ghcr.io":{"auth":"%s"}}}\n' \
+              "$(printf '%s:%s' "$GITHUB_ACTOR" "$GHCR_TOKEN" | base64)" \
+              > ~/.docker/config.json
             cd ~/Solar
             git pull --ff-only
             HELIOS_VERSION=$GITHUB_SHA HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh

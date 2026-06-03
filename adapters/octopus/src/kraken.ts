@@ -71,6 +71,7 @@ export async function fetchDispatchSchedule(
 
 const SavingSessionsSchema = z.object({
   savingSessions: z.object({
+    hasJoinedCampaign: z.boolean().optional(),
     events: z.array(
       z.object({
         id: z.string(),
@@ -80,11 +81,8 @@ const SavingSessionsSchema = z.object({
         rewardPerKwhInOctoPoints: z.number().optional(),
       }),
     ),
-    account: z
-      .object({
-        hasJoinedCampaign: z.boolean().optional(),
-        joinedEvents: z.array(z.object({ id: z.string() })).optional(),
-      })
+    joinedEvents: z
+      .array(z.object({ eventId: z.string().optional(), id: z.string().optional() }))
       .optional(),
   }),
 });
@@ -94,17 +92,15 @@ export async function fetchSavingSessions(
   accountNumber: string,
 ): Promise<{ events: SavingSessionEvent[] }> {
   const query = `{
-    savingSessions {
+    savingSessions(accountNumber: "${accountNumber}") {
+      hasJoinedCampaign
       events { id startAt endAt durationInMinutes rewardPerKwhInOctoPoints }
-      account(accountNumber: "${accountNumber}") {
-        hasJoinedCampaign
-        joinedEvents { id }
-      }
+      joinedEvents { eventId }
     }
   }`;
   const data = await gql({ query }, SavingSessionsSchema, token);
   const joined = new Set(
-    (data.savingSessions.account?.joinedEvents ?? []).map((e) => e.id),
+    (data.savingSessions.joinedEvents ?? []).map((e) => e.eventId ?? e.id ?? ''),
   );
   const events: SavingSessionEvent[] = data.savingSessions.events.map((e) => ({
     id: e.id,
