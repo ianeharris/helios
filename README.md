@@ -40,10 +40,10 @@ cp infra/launchd/com.helios.backup.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.helios.backup.plist
 
 # 7. Add GitHub Secrets for CI/CD
-#    MAC_MINI_HOST    - Tailscale IP: 100.73.176.2
+#    MAC_MINI_HOST    - Tailscale IP: 100.127.66.15
 #    MAC_MINI_USER    - ian
 #    MAC_MINI_SSH_KEY - contents of ~/.ssh/id_ed25519 (generate if needed)
-gh secret set MAC_MINI_HOST --body "100.73.176.2"
+gh secret set MAC_MINI_HOST --body "100.127.66.15"
 gh secret set MAC_MINI_USER --body "ian"
 gh secret set MAC_MINI_SSH_KEY < ~/.ssh/id_ed25519
 

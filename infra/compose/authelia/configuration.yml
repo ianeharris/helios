@@ -18,7 +18,7 @@ access_control:
   rules:
     - domain:
         - helios.lan
-        - ians-mac-mini.tailfc238d.ts.net
+        - m1-mac-mini.tailfc238d.ts.net
       policy: one_factor
 
 session:
@@ -30,8 +30,8 @@ session:
       expiration: 12h
       inactivity: 4h
     - name: helios_session_ts
-      domain: ians-mac-mini.tailfc238d.ts.net
-      authelia_url: https://ians-mac-mini.tailfc238d.ts.net/auth
+      domain: m1-mac-mini.tailfc238d.ts.net
+      authelia_url: https://m1-mac-mini.tailfc238d.ts.net/auth
       expiration: 12h
       inactivity: 4h
 
