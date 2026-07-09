@@ -6,7 +6,7 @@ Bespoke home automation platform for 28 Bradgate. Single control surface across 
 
 Helios production runs on the M1 Mac mini (`m1-mac-mini`, Tailscale `100.127.66.15`, LAN `192.168.86.102`) via OrbStack and Docker Compose. The repo is `ianeharris/Solar` and the canonical checkout path is `~/Solar`.
 
-As of 2026-07-09, the local tree has WS-A foundation work in progress: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts and event writes. These commits are local until pushed and deployed.
+As of 2026-07-09, the local tree has WS-A foundation work in progress: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts, event writes, stream-backed Energy hooks and a registry-backed Rooms screen. These commits are local until pushed and deployed.
 
 ## Mac mini setup checklist
 
