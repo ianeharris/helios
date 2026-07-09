@@ -8,6 +8,14 @@ scrape_configs:
       - targets: ['api:3000']
     metrics_path: /metrics
 
+  - job_name: helios-adapters
+    static_configs:
+      - targets:
+          - 'adapter-octopus:9100'
+          - 'adapter-foxess:9100'
+          # Enable when adapter-hue is uncommented in docker-compose.yml.
+          # - 'adapter-hue:9100'
+
   - job_name: postgres
     static_configs:
       - targets: ['db:9187']

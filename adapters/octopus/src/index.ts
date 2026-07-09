@@ -17,7 +17,7 @@
  *   20:00 daily   — Intelligent dispatch schedule for tonight
  */
 
-import mqtt from 'mqtt';
+import { connect } from '@helios/adapter-sdk';
 import { loadConfig, type Config } from './config.js';
 import { fetchRates, fetchConsumption } from './api.js';
 import { obtainKrakenToken, fetchDeviceIds, fetchDispatchSchedule, fetchSavingSessions } from './kraken.js';
@@ -49,14 +49,7 @@ function isCurrentlyDispatched(slots: DispatchSlot[]): boolean {
 const run = async (): Promise<void> => {
   const config = await loadConfig();
 
-  console.log(`[octopus] connecting to MQTT at ${config.mqttUrl}`);
-  const mqttClient = await mqtt.connectAsync(config.mqttUrl, {
-    clientId: `helios-adapter-octopus-${process.pid}`,
-    clean: true,
-    reconnectPeriod: 5000,
-  });
-  mqttClient.on('error', (err) => console.error('[octopus] MQTT error:', err));
-  console.log('[octopus] MQTT connected');
+  const runtime = await connect('octopus', { mqttUrl: config.mqttUrl });
 
   // ── Kraken token (non-fatal — degrades gracefully without Intelligent data) ──
 
@@ -68,6 +61,7 @@ const run = async (): Promise<void> => {
     krakenDeviceIds = await fetchDeviceIds(krakenToken, config.accountNumber);
     console.log(`[octopus] ${krakenDeviceIds.length} Kraken device(s): ${krakenDeviceIds.join(', ')}`);
   } catch (err) {
+    runtime.markError();
     console.error('[octopus] Kraken token failed — dispatch schedule and saving sessions unavailable:', err);
   }
 
@@ -88,7 +82,11 @@ const run = async (): Promise<void> => {
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
   const publish = async (topic: string, payload: unknown, retain: boolean): Promise<void> => {
-    await mqttClient.publishAsync(topic, JSON.stringify(payload), { retain, qos: 1 });
+    if (retain) {
+      await runtime.publishState(topic, payload);
+    } else {
+      await runtime.publishEvent(topic, payload);
+    }
   };
 
   const refreshExportRate = async (cfg: Config): Promise<void> => {
@@ -102,6 +100,7 @@ const run = async (): Promise<void> => {
   try {
     await refreshExportRate(config);
   } catch (err) {
+    runtime.markError();
     console.error('[octopus] initial export rate fetch failed:', err);
   }
 
@@ -127,6 +126,7 @@ const run = async (): Promise<void> => {
         ` | ${state.slots.length} upcoming slots`,
       );
     } catch (err) {
+      runtime.markError();
       console.error('[octopus] tariff poll error:', err);
     }
   };
@@ -150,6 +150,7 @@ const run = async (): Promise<void> => {
       }, true);
       console.log(`[octopus] dispatch schedule: ${allSlots.length} planned slots`);
     } catch (err) {
+      runtime.markError();
       console.error('[octopus] dispatch schedule error:', err);
       try {
         krakenToken = await obtainKrakenToken(config.apiKey);
@@ -170,6 +171,7 @@ const run = async (): Promise<void> => {
       await publish(TOPIC_SAVING_SESSION, { active: active.length > 0, events, fetched_at: now }, true);
       console.log(`[octopus] saving sessions: ${events.length} events, ${active.length} active`);
     } catch (err) {
+      runtime.markError();
       console.error('[octopus] saving sessions error:', err);
       try {
         krakenToken = await obtainKrakenToken(config.apiKey);
@@ -208,6 +210,7 @@ const run = async (): Promise<void> => {
       try {
         await fetchAndPublish(config.importMpan, config.importMeterSerial, 'import', TOPIC_CONSUMPTION_IMPORT);
       } catch (err) {
+        runtime.markError();
         console.error('[octopus] import consumption error:', err);
       }
     }
@@ -216,6 +219,7 @@ const run = async (): Promise<void> => {
       try {
         await fetchAndPublish(config.exportMpan, config.exportMeterSerial, 'export', TOPIC_CONSUMPTION_EXPORT);
       } catch (err) {
+        runtime.markError();
         console.error('[octopus] export consumption error:', err);
       }
     }
@@ -227,6 +231,7 @@ const run = async (): Promise<void> => {
     try {
       await refreshExportRate(config);
     } catch (err) {
+      runtime.markError();
       console.error('[octopus] rate refresh error:', err);
     }
   };
@@ -264,15 +269,10 @@ const run = async (): Promise<void> => {
   const pollTimer = setInterval(() => void pollTariff(), config.pollIntervalMs);
   const dailyTimer = setInterval(() => void runDailyTasks(), 60_000);
 
-  const shutdown = (): void => {
-    console.log('[octopus] shutting down');
+  runtime.onShutdown(() => {
     clearInterval(pollTimer);
     clearInterval(dailyTimer);
-    void mqttClient.endAsync();
-    process.exit(0);
-  };
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  });
 };
 
 run().catch((err) => {

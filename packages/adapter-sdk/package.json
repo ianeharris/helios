@@ -1,24 +1,21 @@
 {
-  "name": "@helios/adapter-hue",
+  "name": "@helios/adapter-sdk",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
+  "types": "./src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsx watch src/index.ts",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@helios/adapter-sdk": "*",
-    "@helios/shared": "*",
     "mqtt": "^5.10.0",
-    "zod": "^3.23.0"
+    "prom-client": "^15.1.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.0.0",
     "typescript": "*",
     "vitest": "^2.0.0"
   }

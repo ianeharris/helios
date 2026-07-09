@@ -11,8 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@helios/adapter-sdk": "*",
     "@helios/shared": "*",
-    "mqtt": "^5.10.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

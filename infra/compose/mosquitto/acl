@@ -6,8 +6,7 @@ user octopus
 topic write helios/energy/#
 
 user hue
-topic write helios/lights/#
-topic read helios/lights/+/set
+topic readwrite helios/hue/#
 
 user sonos
 topic write helios/audio/#
@@ -15,7 +14,10 @@ topic read helios/audio/+/command
 
 user api
 topic read helios/#
-topic write helios/+/command
+topic write helios/hue/#
+topic write helios/audio/#
+topic write helios/heating/#
+topic write helios/security/#
 
 user foxess
 topic write helios/energy/foxess/#

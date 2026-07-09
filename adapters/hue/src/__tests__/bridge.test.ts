@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { MqttClient } from 'mqtt';
 import type { HueLightResource, HueRoomResource, HueGroupedLightResource, HueSceneResource, HueLightState, HueRoomState } from '../types.js';
 
 // We test the BridgeManager's SSE event handling in isolation by mocking
@@ -54,11 +53,10 @@ const makeGroupedLight = (overrides: Partial<HueGroupedLightResource> = {}): Hue
 });
 
 let publishedMessages: Array<{ topic: string; payload: string }> = [];
-const mockMqtt = {
-  publish: vi.fn((topic: string, payload: string) => {
-    publishedMessages.push({ topic, payload });
-  }),
-} as unknown as MqttClient;
+const publishState = vi.fn((topic: string, payload: unknown): Promise<void> => {
+  publishedMessages.push({ topic, payload: JSON.stringify(payload) });
+  return Promise.resolve();
+});
 
 beforeEach(() => {
   publishedMessages = [];
@@ -70,7 +68,7 @@ beforeEach(() => {
 
 describe('BridgeManager', () => {
   it('publishes initial light state on start', async () => {
-    const manager = new BridgeManager(bridge, mockMqtt, 120_000, 5_000);
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
     await manager.start();
 
     const lightMsg = publishedMessages.find((m) =>
@@ -84,7 +82,7 @@ describe('BridgeManager', () => {
   });
 
   it('publishes initial room state on start', async () => {
-    const manager = new BridgeManager(bridge, mockMqtt, 120_000, 5_000);
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
     await manager.start();
 
     const roomMsg = publishedMessages.find((m) =>
@@ -97,7 +95,7 @@ describe('BridgeManager', () => {
   });
 
   it('topics are namespaced by bridgeId', async () => {
-    const manager = new BridgeManager(bridge, mockMqtt, 120_000, 5_000);
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
     await manager.start();
 
     const topics = publishedMessages.map((m) => m.topic);

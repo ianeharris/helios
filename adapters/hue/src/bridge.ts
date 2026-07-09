@@ -9,7 +9,6 @@
  * On SSE event: apply delta to in-memory state, publish only the changed resource.
  */
 
-import type { MqttClient } from 'mqtt';
 import { fetchLights, fetchRooms, fetchGroupedLights, fetchScenes } from './api.js';
 import { HueSseConnection } from './sse.js';
 import type {
@@ -52,6 +51,8 @@ const groupedLightToState = (
   ...(gl.dimming !== undefined && { brightness: gl.dimming.brightness }),
 });
 
+type StatePublisher = (topic: string, payload: unknown) => Promise<void>;
+
 export class BridgeManager {
   private lights = new Map<string, HueLightResource>();
   private rooms = new Map<string, HueRoomResource>();
@@ -61,7 +62,7 @@ export class BridgeManager {
 
   constructor(
     private readonly bridge: BridgeConfig,
-    private readonly mqtt: MqttClient,
+    private readonly publishState: StatePublisher,
     private readonly sseTimeoutMs: number,
     private readonly reconnectDelayMs: number,
   ) {
@@ -86,7 +87,7 @@ export class BridgeManager {
       `[hue/${this.bridge.name}] snapshot: ${lights.length} lights, ${rooms.length} rooms, ${scenes.length} scenes`,
     );
 
-    this.publishAll();
+    await this.publishAll();
     this.sse.start();
   }
 
@@ -94,22 +95,22 @@ export class BridgeManager {
     this.sse.stop();
   }
 
-  private publish(t: string, payload: unknown): void {
-    this.mqtt.publish(t, JSON.stringify(payload), { retain: true, qos: 1 });
+  private async publish(t: string, payload: unknown): Promise<void> {
+    await this.publishState(t, payload);
   }
 
-  private publishAll(): void {
+  private async publishAll(): Promise<void> {
     for (const [id, light] of this.lights) {
-      this.publish(topic(this.bridge.id, 'light', id), lightToState(this.bridge, light));
+      await this.publish(topic(this.bridge.id, 'light', id), lightToState(this.bridge, light));
     }
     for (const [id, gl] of this.groupedLights) {
       const room = [...this.rooms.values()].find((r) =>
         r.services.some((s) => s.rid === id && s.rtype === 'grouped_light'),
       );
-      this.publish(topic(this.bridge.id, 'room', id), groupedLightToState(this.bridge, gl, room));
+      await this.publish(topic(this.bridge.id, 'room', id), groupedLightToState(this.bridge, gl, room));
     }
     for (const [id, scene] of this.scenes) {
-      this.publish(topic(this.bridge.id, 'scene', id), {
+      await this.publish(topic(this.bridge.id, 'scene', id), {
         bridgeId: this.bridge.id,
         resourceId: id,
         name: scene.metadata.name,
@@ -139,7 +140,9 @@ export class BridgeManager {
             existing.color.xy = delta.color.xy;
           }
 
-          this.publish(topic(this.bridge.id, 'light', delta.id), lightToState(this.bridge, existing));
+          void this.publish(topic(this.bridge.id, 'light', delta.id), lightToState(this.bridge, existing)).catch((err) =>
+            console.error(`[hue/${this.bridge.name}] light publish error:`, err),
+          );
         } else if (delta.type === 'grouped_light') {
           const existing = this.groupedLights.get(delta.id);
           if (!existing) continue;
@@ -150,7 +153,9 @@ export class BridgeManager {
           const room = [...this.rooms.values()].find((r) =>
             r.services.some((s) => s.rid === delta.id && s.rtype === 'grouped_light'),
           );
-          this.publish(topic(this.bridge.id, 'room', delta.id), groupedLightToState(this.bridge, existing, room));
+          void this.publish(topic(this.bridge.id, 'room', delta.id), groupedLightToState(this.bridge, existing, room)).catch((err) =>
+            console.error(`[hue/${this.bridge.name}] room publish error:`, err),
+          );
         }
       }
     }
