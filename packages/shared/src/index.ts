@@ -6,3 +6,4 @@ export * from './types/energy.js';
 export * from './types/event.js';
 export * from './types/room.js';
 export * from './types/tariff.js';
+export * from './types/registry.js';

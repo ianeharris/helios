@@ -38,7 +38,7 @@ const makeRoom = (overrides: Partial<HueRoomResource> = {}): HueRoomResource => 
   id: 'room-1',
   type: 'room',
   metadata: { name: 'Lounge', archetype: 'living_room' },
-  children: [],
+  children: [{ rid: 'device-1', rtype: 'device' }],
   services: [{ rid: 'gl-1', rtype: 'grouped_light' }],
   ...overrides,
 });
@@ -60,6 +60,7 @@ const publishState = vi.fn((topic: string, payload: unknown): Promise<void> => {
 
 beforeEach(() => {
   publishedMessages = [];
+  publishState.mockClear();
   vi.mocked(fetchLights).mockResolvedValue([makeLight()]);
   vi.mocked(fetchRooms).mockResolvedValue([makeRoom()]);
   vi.mocked(fetchGroupedLights).mockResolvedValue([makeGroupedLight()]);
@@ -99,6 +100,34 @@ describe('BridgeManager', () => {
     await manager.start();
 
     const topics = publishedMessages.map((m) => m.topic);
-    expect(topics.every((t) => t.startsWith(`helios/hue/${bridge.id}/`))).toBe(true);
+    expect(topics.every((t) => t.startsWith(`helios/hue/${bridge.id}/`) || t === `helios/registry/hue/${bridge.id}/discovery`)).toBe(true);
+  });
+
+  it('publishes a registry discovery snapshot on start', async () => {
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
+    await manager.start();
+
+    const discoveryMsg = publishedMessages.find((m) =>
+      m.topic === `helios/registry/hue/${bridge.id}/discovery`,
+    );
+    expect(discoveryMsg).toBeDefined();
+    const discovery = JSON.parse(discoveryMsg!.payload) as {
+      adapter: string;
+      rooms: Array<{ id: string; name: string }>;
+      devices: Array<{ id: string; roomId: string | null; rawState: { bridgeId: string; resourceId: string } }>;
+    };
+    expect(discovery.adapter).toBe('hue');
+    expect(discovery.rooms[0]).toMatchObject({
+      id: `hue/${bridge.id}/room/room-1`,
+      name: 'Lounge',
+    });
+    expect(discovery.devices[0]).toMatchObject({
+      id: `hue/${bridge.id}/light/light-1`,
+      roomId: `hue/${bridge.id}/room/room-1`,
+    });
+    expect(discovery.devices[0]!.rawState).toMatchObject({
+      bridgeId: bridge.id,
+      resourceId: 'light-1',
+    });
   });
 });

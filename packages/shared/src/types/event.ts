@@ -7,6 +7,7 @@ export type EventKind =
   | 'alarm_disarmed'
   | 'motion_detected'
   | 'energy_reading'
+  | 'registry_discovery'
   | 'adapter_error'
   | 'adapter_reconnected';
 

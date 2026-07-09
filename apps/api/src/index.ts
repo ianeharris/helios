@@ -7,6 +7,7 @@ import { energyRoutes } from './routes/energy.js';
 import { roomRoutes } from './routes/rooms.js';
 import { deviceRoutes } from './routes/devices.js';
 import { streamRoutes } from './routes/stream.js';
+import { sceneRoutes } from './routes/scenes.js';
 import { metricsRoutes } from './routes/metrics.js';
 
 const app = Fastify({ logger: true });
@@ -17,6 +18,7 @@ app.register(metricsRoutes);
 app.register(energyRoutes);
 app.register(roomRoutes);
 app.register(deviceRoutes);
+app.register(sceneRoutes);
 app.register(streamRoutes);
 
 const start = async (): Promise<void> => {

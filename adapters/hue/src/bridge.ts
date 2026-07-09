@@ -10,6 +10,7 @@
  */
 
 import { fetchLights, fetchRooms, fetchGroupedLights, fetchScenes } from './api.js';
+import type { AdapterDiscoveryMessage } from '@helios/shared';
 import { HueSseConnection } from './sse.js';
 import type {
   BridgeConfig,
@@ -24,6 +25,18 @@ import type {
 
 const topic = (bridgeId: string, kind: string, id: string): string =>
   `helios/hue/${bridgeId}/${kind}/${id}`;
+
+const registryTopic = (bridgeId: string): string =>
+  `helios/registry/hue/${bridgeId}/discovery`;
+
+const roomId = (bridgeId: string, id: string): string =>
+  `hue/${bridgeId}/room/${id}`;
+
+const lightId = (bridgeId: string, id: string): string =>
+  `hue/${bridgeId}/light/${id}`;
+
+const sceneId = (bridgeId: string, id: string): string =>
+  `hue/${bridgeId}/scene/${id}`;
 
 const lightToState = (bridge: BridgeConfig, r: HueLightResource): HueLightState => ({
   bridgeId: bridge.id,
@@ -87,6 +100,7 @@ export class BridgeManager {
       `[hue/${this.bridge.name}] snapshot: ${lights.length} lights, ${rooms.length} rooms, ${scenes.length} scenes`,
     );
 
+    await this.publishDiscovery();
     await this.publishAll();
     this.sse.start();
   }
@@ -117,6 +131,54 @@ export class BridgeManager {
         groupId: scene.group.rid,
       });
     }
+  }
+
+  private async publishDiscovery(): Promise<void> {
+    const discovery: AdapterDiscoveryMessage = {
+      adapter: 'hue',
+      discoveredAt: new Date().toISOString(),
+      rooms: [...this.rooms.values()].map((room) => ({
+        id: roomId(this.bridge.id, room.id),
+        name: room.metadata.name,
+        icon: room.metadata.archetype,
+        rawState: { bridgeId: this.bridge.id, resourceId: room.id, archetype: room.metadata.archetype },
+      })),
+      devices: [...this.lights.values()].map((light) => ({
+        id: lightId(this.bridge.id, light.id),
+        vendor: 'hue',
+        kind: 'light',
+        name: light.metadata.name,
+        roomId: this.roomIdForDevice(light.owner.rid),
+        reachable: true,
+        tags: ['lighting'],
+        rawState: lightToState(this.bridge, light) as unknown as Record<string, unknown>,
+      })),
+      scenes: [...this.scenes.values()].map((scene) => ({
+        id: sceneId(this.bridge.id, scene.id),
+        name: scene.metadata.name,
+        roomId: this.roomIdForGroupedLight(scene.group.rid),
+        definition: [{
+          topic: `helios/hue/${this.bridge.id}/scene/${scene.id}/recall`,
+          payload: {},
+        }],
+      })),
+    };
+
+    await this.publish(registryTopic(this.bridge.id), discovery);
+  }
+
+  private roomIdForDevice(deviceId: string): string | null {
+    const room = [...this.rooms.values()].find((candidate) =>
+      candidate.children.some((child) => child.rid === deviceId && child.rtype === 'device'),
+    );
+    return room ? roomId(this.bridge.id, room.id) : null;
+  }
+
+  private roomIdForGroupedLight(groupedLightId: string): string | null {
+    const room = [...this.rooms.values()].find((candidate) =>
+      candidate.services.some((service) => service.rid === groupedLightId && service.rtype === 'grouped_light'),
+    );
+    return room ? roomId(this.bridge.id, room.id) : null;
   }
 
   private handleSseEvents(events: HueStreamEvent[], _bridgeId: string): void {

@@ -1,4 +1,4 @@
-export type VendorId = 'hue' | 'sonos' | 'hikvision' | 'foxess' | 'texecom' | 'hive';
+export type VendorId = 'hue' | 'sonos' | 'hikvision' | 'foxess' | 'octopus' | 'texecom' | 'hive';
 
 export type DeviceKind =
   | 'light'

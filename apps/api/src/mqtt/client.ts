@@ -1,7 +1,9 @@
 import mqtt from 'mqtt';
-import { mqttSet } from './cache.js';
+import { mqttGet, mqttSet } from './cache.js';
 import { insertEnergyReading } from '../db/energy.js';
-import type { FoxEssLive } from '@helios/shared';
+import { insertEvent } from '../db/events.js';
+import { upsertDiscovery } from '../db/registry.js';
+import type { AdapterDiscoveryMessage, FoxEssLive } from '@helios/shared';
 
 export type MqttEvent = {
   topic: string;
@@ -25,16 +27,31 @@ export const connectMqtt = async (): Promise<void> => {
 
   await client.subscribeAsync('helios/#');
   client.on('message', (topic, payload) => {
-    mqttSet(topic, payload);
+    const previous = mqttGet<unknown>(topic);
     const event = toEvent(topic, payload);
+    mqttSet(topic, payload);
+
     for (const listener of listeners) listener(event);
+
+    if (isDiscoveryTopic(topic)) {
+      upsertDiscovery(event.payload as AdapterDiscoveryMessage)
+        .catch((err) => console.error('[mqtt] registry upsert error:', err));
+      return;
+    }
 
     if (topic === 'helios/energy/foxess/live') {
       try {
-        const live = JSON.parse(payload.toString()) as FoxEssLive;
+        const live = event.payload as FoxEssLive;
         insertEnergyReading(live).catch((err) => console.error('[mqtt] energy insert error:', err));
       } catch {
         // malformed payload — skip
+      }
+    }
+
+    if (previous !== null && hasChanged(previous, event.payload)) {
+      const eventInput = eventForTopic(topic, event.payload);
+      if (eventInput) {
+        insertEvent(eventInput).catch((err) => console.error('[mqtt] event insert error:', err));
       }
     }
   });
@@ -66,4 +83,35 @@ const parsePayload = (payload: Buffer): unknown => {
   } catch {
     return payload.toString();
   }
+};
+
+const isDiscoveryTopic = (topic: string): boolean =>
+  /^helios\/registry\/.+\/discovery$/.test(topic);
+
+const hasChanged = (previous: unknown, next: unknown): boolean =>
+  JSON.stringify(previous) !== JSON.stringify(next);
+
+type EventInput = Parameters<typeof insertEvent>[0];
+
+const eventForTopic = (topic: string, payload: unknown): EventInput | null => {
+  const hueMatch = /^helios\/hue\/([^/]+)\/(light|room)\/([^/]+)$/.exec(topic);
+  if (hueMatch) {
+    return {
+      vendor: 'hue',
+      kind: 'device_state_changed',
+      deviceId: `hue/${hueMatch[1]}/${hueMatch[2]}/${hueMatch[3]}`,
+      payload,
+    };
+  }
+
+  if (topic === 'helios/energy/foxess/live') {
+    return {
+      vendor: 'foxess',
+      kind: 'energy_reading',
+      deviceId: 'foxess/live',
+      payload,
+    };
+  }
+
+  return null;
 };

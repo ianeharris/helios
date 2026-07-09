@@ -6,12 +6,20 @@ type DeviceRow = {
   id: string;
   vendor: string;
   kind: string;
+  name: string;
+  room_id: string | null;
+  reachable: boolean;
+  role: string | null;
+  tags: string[];
   raw_state: unknown;
+  updated_at: Date;
 };
 
 type SceneRow = {
   id: string;
   name: string;
+  room_id: string | null;
+  icon: string | null;
   definition: unknown;
 };
 
@@ -29,6 +37,64 @@ type SceneAction = {
 };
 
 export const deviceRoutes = (app: FastifyInstance, _opts: unknown, done: () => void): void => {
+  app.get('/devices', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+    const params: unknown[] = [];
+    const clauses: string[] = [];
+
+    if (query['roomId']) {
+      params.push(query['roomId']);
+      clauses.push(`room_id = $${params.length}`);
+    }
+    if (query['vendor']) {
+      params.push(query['vendor']);
+      clauses.push(`vendor = $${params.length}`);
+    }
+
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const { rows } = await getDb().query<DeviceRow>(
+      `SELECT id, vendor, kind, name, room_id, reachable, role, tags, raw_state, updated_at
+         FROM devices
+         ${where}
+        ORDER BY vendor, name`,
+      params,
+    );
+
+    return reply.send(rows.map(deviceResponse));
+  });
+
+  app.patch('/devices/:id', async (req, reply) => {
+    const id = (req.params as Record<string, string>)['id'];
+    const body = objectBody(req.body);
+    const fields: string[] = [];
+    const params: unknown[] = [];
+
+    addOptionalUpdate(fields, params, 'name', body['name']);
+    addOptionalUpdate(fields, params, 'room_id', body['roomId']);
+    addOptionalUpdate(fields, params, 'role', body['role']);
+    if (Array.isArray(body['tags'])) {
+      params.push(body['tags'].filter((tag): tag is string => typeof tag === 'string'));
+      fields.push(`tags = $${params.length}`);
+    }
+
+    if (fields.length === 0) {
+      return reply.status(400).send({ error: 'no supported fields provided' });
+    }
+
+    params.push(id);
+    const { rows } = await getDb().query<DeviceRow>(
+      `UPDATE devices
+          SET ${fields.join(', ')}, updated_at = now()
+        WHERE id = $${params.length}
+        RETURNING id, vendor, kind, name, room_id, reachable, role, tags, raw_state, updated_at`,
+      params,
+    );
+
+    const updated = rows[0];
+    if (!updated) return reply.status(404).send({ error: 'unknown device' });
+    return reply.send(deviceResponse(updated));
+  });
+
   app.post('/devices/:id/command', async (req, reply) => {
     const id = (req.params as Record<string, string>)['id'];
     const device = await findDevice(id);
@@ -43,7 +109,7 @@ export const deviceRoutes = (app: FastifyInstance, _opts: unknown, done: () => v
     return reply.send({ ok: true, deviceId: device.id, topic: resolution.topic });
   });
 
-  app.post('/api/rooms/:id/scene', async (req, reply) => {
+  app.post('/rooms/:id/scene', async (req, reply) => {
     const roomId = (req.params as Record<string, string>)['id'];
     const body = objectBody(req.body);
     const sceneId = stringValue(body['sceneId']);
@@ -94,7 +160,7 @@ export const deviceRoutes = (app: FastifyInstance, _opts: unknown, done: () => v
 const findDevice = async (id: string | undefined): Promise<DeviceRow | null> => {
   if (!id) return null;
   const { rows } = await getDb().query<DeviceRow>(
-    'SELECT id, vendor, kind, raw_state FROM devices WHERE id = $1',
+    'SELECT id, vendor, kind, name, room_id, reachable, role, tags, raw_state, updated_at FROM devices WHERE id = $1',
     [id],
   );
   return rows[0] ?? null;
@@ -103,7 +169,7 @@ const findDevice = async (id: string | undefined): Promise<DeviceRow | null> => 
 const findScene = async (roomId: string | undefined, sceneId?: string, sceneName?: string): Promise<SceneRow | null> => {
   if (!roomId) return null;
   const { rows } = await getDb().query<SceneRow>(
-    `SELECT id, name, definition
+    `SELECT id, name, room_id, icon, definition
        FROM scenes
       WHERE room_id = $1
         AND (($2::text IS NOT NULL AND id = $2) OR ($3::text IS NOT NULL AND name = $3))
@@ -117,8 +183,9 @@ const resolveDeviceCommand = (device: DeviceRow, body: unknown): CommandResoluti
   if (device.vendor !== 'hue') return null;
 
   const rawState = objectBody(device.raw_state);
-  const bridgeId = stringValue(rawState['bridgeId']) ?? parseHueDeviceId(device.id).bridgeId;
-  const resourceId = stringValue(rawState['resourceId']) ?? parseHueDeviceId(device.id).resourceId;
+  const parsed = parseHueDeviceId(device.id);
+  const bridgeId = stringValue(rawState['bridgeId']) ?? parsed.bridgeId;
+  const resourceId = stringValue(rawState['resourceId']) ?? parsed.resourceId;
   if (!bridgeId || !resourceId) return null;
 
   const command = objectBody(body);
@@ -150,6 +217,25 @@ const definedHueParts = (bridgeId: string | undefined, resourceId: string | unde
   if (bridgeId) result.bridgeId = bridgeId;
   if (resourceId) result.resourceId = resourceId;
   return result;
+};
+
+const deviceResponse = (row: DeviceRow): Record<string, unknown> => ({
+  id: row.id,
+  vendor: row.vendor,
+  kind: row.kind,
+  name: row.name,
+  roomId: row.room_id,
+  reachable: row.reachable,
+  role: row.role,
+  tags: row.tags,
+  rawState: row.raw_state,
+  updatedAt: row.updated_at.toISOString(),
+});
+
+const addOptionalUpdate = (fields: string[], params: unknown[], column: string, value: unknown): void => {
+  if (value === undefined) return;
+  params.push(value);
+  fields.push(`${column} = $${params.length}`);
 };
 
 const objectBody = (value: unknown): Record<string, unknown> => {
