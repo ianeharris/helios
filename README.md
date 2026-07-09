@@ -2,7 +2,13 @@
 
 Bespoke home automation platform for 28 Bradgate. Single control surface across macOS, iOS, and iPadOS, sitting above Hue, Sonos, Hikvision, Fox ESS, Texecom, and Hive.
 
-## Phase 0 - Mac mini setup checklist
+## Current status
+
+Helios production runs on the M1 Mac mini (`m1-mac-mini`, Tailscale `100.127.66.15`, LAN `192.168.86.102`) via OrbStack and Docker Compose. The repo is `ianeharris/Solar` and the canonical checkout path is `~/Solar`.
+
+As of 2026-07-09, the local tree has WS-A foundation work in progress: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts and event writes. These commits are local until pushed and deployed.
+
+## Mac mini setup checklist
 
 ### Prerequisites
 
@@ -16,10 +22,10 @@ Bespoke home automation platform for 28 Bradgate. Single control surface across 
 
 ```bash
 # 1. Clone the repo
-gh repo clone ianharris64/helios ~/helios
+gh repo clone ianeharris/Solar ~/Solar
 
 # 2. Generate the age keypair (do this ONCE; keep the key safe)
-age-keygen -o ~/helios/age.key
+age-keygen -o ~/Solar/age.key
 # The public key is printed to stdout - copy it into .sops.yaml and commit
 
 # 3. Back up the age key to the NAS (encrypted vault, not the helios share)
@@ -35,7 +41,7 @@ git add infra/secrets/secrets.yaml && git commit -m "Add encrypted secrets"
 security add-internet-password -a helios -s 192.168.86.4 -w <helios_nas_smb_password>
 
 # 6. Install the backup launchd job
-mkdir -p ~/helios/logs
+mkdir -p ~/Solar/logs
 cp infra/launchd/com.helios.backup.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.helios.backup.plist
 
@@ -48,7 +54,7 @@ gh secret set MAC_MINI_USER --body "ian"
 gh secret set MAC_MINI_SSH_KEY < ~/.ssh/id_ed25519
 
 # 8. First deploy
-cd ~/helios/infra/compose
+cd ~/Solar/infra/compose
 bash ../../infra/scripts/decrypt-secrets.sh
 docker compose up -d
 docker compose ps
@@ -72,7 +78,7 @@ curl https://helios.lan/health
 ```
 Solar/
   apps/
-    api/          Node.js/TypeScript API (Fastify)
+    api/          Node.js/TypeScript API (Fastify REST + WebSocket)
     web/          React PWA (Vite)
   adapters/
     hue/          Philips Hue Bridge v2 adapter (Phase 1)
@@ -80,9 +86,10 @@ Solar/
     hikvision/    Hikvision ISAPI + go2rtc (Phase 4)
     foxess/       Fox ESS Open API adapter (Phase 2)
     texecom/      Texecom Premier Elite / SmartCom adapter (Phase 4)
-    hive/         Hive Beekeeper API adapter (Phase 3)
+    hive/         Hive adapter stub; HA Core bridge is the primary planned path
   packages/
     shared/       Shared TypeScript types used across all packages
+    adapter-sdk/  Shared adapter runtime: MQTT, secrets, health, metrics
   infra/
     compose/      Docker Compose stack (prod and staging)
     secrets/      SOPS-encrypted secrets (committed; plaintext never committed)
@@ -96,12 +103,13 @@ Solar/
 
 | Phase | Content | Status |
 |-------|---------|--------|
-| 0 | Foundations: repo, Compose stack, CI/CD, secrets, backup | In progress |
-| 1 | Lighting (Hue) and audio (Sonos) | Pending |
-| 2 | Energy (Fox ESS, Octopus) | Pending |
+| 0 | Foundations: repo, Compose stack, CI/CD, secrets, backup | Complete |
+| WS-A | Hardening: adapter SDK, API commands, stream, registry, tests, CI cleanup | In progress |
+| 1 / WS-B | Lighting (Hue) and audio (Sonos) | In progress |
+| 2 / WS-C | Energy (Fox ESS, Octopus) | In progress |
 | 3 | Heating (Hive) | Pending |
 | 4 | Security: Hikvision cameras + Texecom alarm | Pending |
 | 5 | Automation engine + notifications + polish | Pending |
 | 6 | Native shell, widgets, Siri (optional) | Backlog |
 
-Full plan: `03 - Personal/Home/Helios/Helios - Delivery Plan.md` in the Obsidian vault.
+Full plan: `03 - Personal/Home/Helios/Helios - Implementation Plan 2026-07.md` in the Obsidian vault, with the older delivery-plan note retained for history.
