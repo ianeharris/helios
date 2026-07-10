@@ -7,7 +7,7 @@
 
 ## What this project is
 
-**Helios** is a bespoke, self-hosted home automation platform for 28 Bradgate, Cuffley, EN6 4RL. It sits above the existing vendor apps (Hue, Sonos, Hikvision, Fox ESS, Texecom, Hive) and provides a single sophisticated control surface on macOS, iOS and iPadOS. Local-first. No cloud dependency. No recurring subscriptions.
+**Helios** is a self-hosted, single-household home automation platform. The 28 Bradgate deployment is the reference installation. It sits above the existing vendor apps (Hue, Sonos, Hikvision, Fox ESS, Texecom, Hive) and provides a single sophisticated control surface on macOS, iOS and iPadOS. Local-first. No cloud dependency. No recurring subscriptions.
 
 The project folder on disk is `Solar`. The name Helios is chosen because solar energy from the house PV system is a first-class concern of the platform.
 
@@ -61,7 +61,7 @@ These notes tell you exactly what phase we are in, what is done, what is pending
 
 | Role | Machine | Address |
 |---|---|---|
-| Compute / always-on host | Mac mini (`ians-mac-mini`) | Tailscale `100.73.176.2`, LAN `192.168.86.x` |
+| Compute / always-on host | M1 Mac mini (`m1-mac-mini`) | Tailscale `100.127.66.15`, LAN `192.168.86.102` |
 | Storage / backup target | Synology DS415play | Tailscale `100.69.42.15`, LAN `192.168.86.4` |
 | Remote access | Tailscale tailnet | All devices on the same tailnet (Google identity: ianharris64@gmail.com) |
 
@@ -145,7 +145,7 @@ End-of-phase code review by a fresh Sonnet subagent in its own context is mandat
     hikvision/                     # Hikvision ISAPI + go2rtc (stub)
     texecom/                       # Texecom SmartCom SIA-IP (stub)
   apps/
-    api/                           # Fastify API + GraphQL
+    api/                           # Fastify REST + WebSocket API
     web/                           # React PWA (Vite)
   packages/
     shared/                        # Shared TypeScript types

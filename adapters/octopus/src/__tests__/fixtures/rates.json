@@ -1,0 +1,24 @@
+{
+  "count": 3,
+  "next": null,
+  "results": [
+    {
+      "value_exc_vat": 4.95,
+      "value_inc_vat": 5.2,
+      "valid_from": "2026-07-10T00:00:00Z",
+      "valid_to": "2026-07-10T00:30:00Z"
+    },
+    {
+      "value_exc_vat": 25.1,
+      "value_inc_vat": 26.36,
+      "valid_from": "2026-07-10T00:30:00Z",
+      "valid_to": "2026-07-10T01:00:00Z"
+    },
+    {
+      "value_exc_vat": 4.95,
+      "value_inc_vat": 5.2,
+      "valid_from": "2026-07-10T01:00:00Z",
+      "valid_to": "2026-07-10T01:30:00Z"
+    }
+  ]
+}

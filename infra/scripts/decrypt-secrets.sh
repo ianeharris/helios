@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Decrypt SOPS secrets into the compose secrets/ directory before docker compose up.
-# Runs on the Mac mini at deploy time. Requires age key at ~/helios/age.key
+# Runs on the Mac mini at deploy time. Requires age key at ~/.config/helios/age.key
 
 set -euo pipefail
 

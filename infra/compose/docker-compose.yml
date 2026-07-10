@@ -41,7 +41,7 @@ services:
   # ── API ───────────────────────────────────────────────────────────────────────
 
   api:
-    image: ghcr.io/ianeharris/helios-api:${HELIOS_VERSION:-latest}
+    image: ghcr.io/ianeharris/helios-api:${HELIOS_VERSION:?HELIOS_VERSION is required}
     restart: unless-stopped
     depends_on:
       db:
@@ -67,7 +67,7 @@ services:
   # Phase 1+ images; commented out until the relevant phase starts.
 
   adapter-octopus:
-    image: ghcr.io/ianeharris/helios-adapter-octopus:${HELIOS_VERSION:-latest}
+    image: ghcr.io/ianeharris/helios-adapter-octopus:${HELIOS_VERSION:?HELIOS_VERSION is required}
     restart: unless-stopped
     depends_on: [mosquitto]
     environment:
@@ -83,7 +83,7 @@ services:
       - octopus_api_key
 
   adapter-foxess:
-    image: ghcr.io/ianeharris/helios-adapter-foxess:${HELIOS_VERSION:-latest}
+    image: ghcr.io/ianeharris/helios-adapter-foxess:${HELIOS_VERSION:?HELIOS_VERSION is required}
     restart: unless-stopped
     depends_on: [mosquitto]
     environment:
@@ -92,7 +92,7 @@ services:
       - foxess_api_key
 
   # adapter-hue:
-  #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:-latest}
+  #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:?HELIOS_VERSION is required}
   #   restart: unless-stopped
   #   depends_on: [mosquitto]
   #   environment:
@@ -106,7 +106,7 @@ services:
   # ── Web frontend ─────────────────────────────────────────────────────────────
 
   web:
-    image: ghcr.io/ianeharris/helios-web:${HELIOS_VERSION:-latest}
+    image: ghcr.io/ianeharris/helios-web:${HELIOS_VERSION:?HELIOS_VERSION is required}
     restart: unless-stopped
     depends_on:
       api:

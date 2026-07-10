@@ -111,20 +111,14 @@ jobs:
             REPO=ghcr.io/ianeharris
             build_push() {
               local ctx=$1 img=$2
-              echo ">>> building $img"
-              docker build -f "$ctx/Dockerfile" -t "$REPO/$img:latest" -t "$REPO/$img:$GITHUB_SHA" . \
-                && docker push "$REPO/$img:latest" \
+              echo ">>> building $img:$GITHUB_SHA"
+              docker build -f "$ctx/Dockerfile" -t "$REPO/$img:$GITHUB_SHA" . \
                 && docker push "$REPO/$img:$GITHUB_SHA"
             }
             build_push apps/api           helios-api
             build_push apps/web           helios-web
-            build_push adapters/hue       helios-adapter-hue
             build_push adapters/octopus   helios-adapter-octopus
-            build_push adapters/sonos     helios-adapter-sonos
-            build_push adapters/hikvision helios-adapter-hikvision
             build_push adapters/foxess    helios-adapter-foxess
-            build_push adapters/texecom   helios-adapter-texecom
-            build_push adapters/hive      helios-adapter-hive
             cd infra/compose
-            docker compose up -d --force-recreate
+            HELIOS_VERSION="$GITHUB_SHA" docker compose up -d --force-recreate
             docker compose ps

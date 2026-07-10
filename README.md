@@ -1,12 +1,16 @@
 # Helios
 
-Bespoke home automation platform for 28 Bradgate. Single control surface across macOS, iOS, and iPadOS, sitting above Hue, Sonos, Hikvision, Fox ESS, Texecom, and Hive.
+Self-hosted home automation platform. The Bradgate deployment is the reference instance, combining Hue, Sonos, Hikvision, Fox ESS, Texecom and Hive behind one control surface for macOS, iOS and iPadOS.
 
 ## Current status
 
 Helios production runs on the M1 Mac mini (`m1-mac-mini`, Tailscale `100.127.66.15`, LAN `192.168.86.102`) via OrbStack and Docker Compose. The repo is `ianeharris/Solar` and the canonical checkout path is `~/Solar`.
 
 As of 2026-07-09, the local tree has WS-A foundation work in progress: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts, event writes, stream-backed Energy hooks and a registry-backed Rooms screen. These commits are local until pushed and deployed.
+
+## Self-hosted model
+
+Helios is one private household installation per deployment. Device access, vendor credentials, room data and automation rules remain inside that household's own network and encrypted configuration. The core is designed to be portable, but packaged distribution is a later milestone after the Bradgate reference installation is a trusted daily driver.
 
 ## Mac mini setup checklist
 
@@ -25,7 +29,8 @@ As of 2026-07-09, the local tree has WS-A foundation work in progress: shared ad
 gh repo clone ianeharris/Solar ~/Solar
 
 # 2. Generate the age keypair (do this ONCE; keep the key safe)
-age-keygen -o ~/Solar/age.key
+mkdir -p ~/.config/helios
+age-keygen -o ~/.config/helios/age.key
 # The public key is printed to stdout - copy it into .sops.yaml and commit
 
 # 3. Back up the age key to the NAS (encrypted vault, not the helios share)
@@ -56,6 +61,7 @@ gh secret set MAC_MINI_SSH_KEY < ~/.ssh/id_ed25519
 # 8. First deploy
 cd ~/Solar/infra/compose
 bash ../../infra/scripts/decrypt-secrets.sh
+export HELIOS_VERSION=<immutable-image-tag>
 docker compose up -d
 docker compose ps
 ```
@@ -72,6 +78,10 @@ open https://helios.lan
 # Health endpoint (no auth)
 curl https://helios.lan/health
 ```
+
+## Deployment versions
+
+CI builds and deploys the enabled service images with the immutable Git commit SHA. For a manual rollback on the Mac mini, set `HELIOS_VERSION` to the earlier deployed SHA, then run `docker compose up -d --force-recreate` from `infra/compose`.
 
 ## Project structure
 

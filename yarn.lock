@@ -785,6 +785,7 @@ __metadata:
     "@helios/adapter-sdk": "npm:*"
     "@helios/shared": "npm:*"
     "@types/node": "npm:^22.0.0"
+    node-cron: "npm:^4.6.0"
     tsx: "npm:^4.0.0"
     typescript: "npm:*"
     vitest: "npm:^2.0.0"
@@ -3521,6 +3522,13 @@ __metadata:
   version: 1.4.0
   resolution: "natural-compare@npm:1.4.0"
   checksum: 10c0/f5f9a7974bfb28a91afafa254b197f0f22c684d4a1731763dda960d2c8e375b36c7d690e0d9dc8fba774c537af14a7e979129bca23d88d052fbeb9466955e447
+  languageName: node
+  linkType: hard
+
+"node-cron@npm:^4.6.0":
+  version: 4.6.0
+  resolution: "node-cron@npm:4.6.0"
+  checksum: 10c0/6523219aedd60441b43acb65670d98751a875185d88666d32ee62b044f15ffdd6a5d5422f0a060a324df918990f218fe9e400bf1db54d308a72642e396a1fbd2
   languageName: node
   linkType: hard
 

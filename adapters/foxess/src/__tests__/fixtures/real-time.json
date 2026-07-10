@@ -1,0 +1,19 @@
+{
+  "errno": 0,
+  "msg": "success",
+  "result": [
+    {
+      "time": "2026-07-10T12:00:00Z",
+      "deviceSN": "H1-TEST-001",
+      "datas": [
+        { "variable": "pvPower", "value": 3.42 },
+        { "variable": "SoC", "value": 71 },
+        { "variable": "batChargePower", "value": 0.8 },
+        { "variable": "batDischargePower", "value": 0.2 },
+        { "variable": "gridConsumptionPower", "value": 1.1 },
+        { "variable": "feedinPower", "value": 0.3 },
+        { "variable": "loadsPower", "value": 3.2 }
+      ]
+    }
+  ]
+}

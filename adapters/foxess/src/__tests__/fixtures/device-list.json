@@ -1,0 +1,17 @@
+{
+  "errno": 0,
+  "msg": "success",
+  "result": {
+    "data": [
+      {
+        "deviceSN": "H1-TEST-001",
+        "moduleSN": "MODULE-001",
+        "deviceType": "H1",
+        "status": 1,
+        "hasBattery": true,
+        "hasPV": true
+      }
+    ],
+    "total": 1
+  }
+}

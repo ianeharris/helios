@@ -21,6 +21,7 @@ import { connect } from '@helios/adapter-sdk';
 import { loadConfig, type Config } from './config.js';
 import { fetchRates, fetchConsumption } from './api.js';
 import { obtainKrakenToken, fetchDeviceIds, fetchDispatchSchedule, fetchSavingSessions } from './kraken.js';
+import { scheduleDailyTasks } from './scheduler.js';
 import { buildState, detectTransition } from './tariff.js';
 import type { TariffState, DispatchSlot, ConsumptionBatch } from './types.js';
 
@@ -30,10 +31,6 @@ const TOPIC_DISPATCH_SCHEDULE = 'helios/energy/octopus/dispatch_schedule';
 const TOPIC_SAVING_SESSION = 'helios/energy/octopus/saving_session';
 const TOPIC_CONSUMPTION_IMPORT = 'helios/energy/octopus/consumption/import';
 const TOPIC_CONSUMPTION_EXPORT = 'helios/energy/octopus/consumption/export';
-
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function yesterdayStr(): string {
   const d = new Date();
@@ -70,14 +67,6 @@ const run = async (): Promise<void> => {
   let prevState: TariffState | null = null;
   let currentDispatch: DispatchSlot[] = [];
   let exportRatePence = 0;
-
-  // Daily task tracking: store the date string for each task last run
-  const dailyRan: Record<string, string | null> = {
-    rateRefresh: null,
-    consumption: null,
-    savingSessions: null,
-    dispatch: null,
-  };
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -236,30 +225,6 @@ const run = async (): Promise<void> => {
     }
   };
 
-  // ── Scheduler ─────────────────────────────────────────────────────────────────
-
-  const runDailyTasks = async (): Promise<void> => {
-    const hour = new Date().getHours();
-    const today = todayStr();
-
-    if (hour === 2 && dailyRan['consumption'] !== today) {
-      dailyRan['consumption'] = today;
-      await runConsumption();
-    }
-    if (hour === 5 && dailyRan['rateRefresh'] !== today) {
-      dailyRan['rateRefresh'] = today;
-      await runRateRefresh();
-    }
-    if (hour === 9 && dailyRan['savingSessions'] !== today) {
-      dailyRan['savingSessions'] = today;
-      await runSavingSessions();
-    }
-    if (hour === 20 && dailyRan['dispatch'] !== today) {
-      dailyRan['dispatch'] = today;
-      await runDispatchFetch();
-    }
-  };
-
   // ── Startup ───────────────────────────────────────────────────────────────────
 
   await pollTariff();
@@ -267,11 +232,18 @@ const run = async (): Promise<void> => {
   await runSavingSessions();
 
   const pollTimer = setInterval(() => void pollTariff(), config.pollIntervalMs);
-  const dailyTimer = setInterval(() => void runDailyTasks(), 60_000);
+  const dailyTasks = scheduleDailyTasks({
+    consumption: runConsumption,
+    rateRefresh: runRateRefresh,
+    savingSessions: runSavingSessions,
+    dispatch: runDispatchFetch,
+  });
 
   runtime.onShutdown(() => {
     clearInterval(pollTimer);
-    clearInterval(dailyTimer);
+    dailyTasks.forEach((task) => {
+      void task.stop();
+    });
   });
 };
 

@@ -14,7 +14,7 @@ const REAL_TIME_VARIABLES = [
   'loadsPower',
 ];
 
-function sign(apiKey: string, timestamp: string, path: string): string {
+export function signRequest(apiKey: string, timestamp: string, path: string): string {
   // Fox ESS requires literal \r\n (4 chars), not CR+LF, in the order: path, token, timestamp
   return createHash('md5')
     .update(`${path}\\r\\n${apiKey}\\r\\n${timestamp}`)
@@ -34,7 +34,7 @@ async function foxRequest<T>(
       'Content-Type': 'application/json',
       token: apiKey,
       timestamp,
-      signature: sign(apiKey, timestamp, path),
+      signature: signRequest(apiKey, timestamp, path),
       lang: 'en',
     },
     body: JSON.stringify(body),
