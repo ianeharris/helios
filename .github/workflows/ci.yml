@@ -72,10 +72,24 @@ jobs:
       - name: Run tests
         run: yarn test
 
+  container-build:
+    name: Container builds
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build enabled service images
+        run: |
+          docker build -f apps/api/Dockerfile -t helios-api:ci .
+          docker build -f apps/web/Dockerfile -t helios-web:ci .
+          docker build -f adapters/octopus/Dockerfile -t helios-adapter-octopus:ci .
+          docker build -f adapters/foxess/Dockerfile -t helios-adapter-foxess:ci .
+
   deploy:
     name: Build on Mac mini & deploy
     runs-on: ubuntu-latest
-    needs: [lint-typecheck, test]
+    needs: [lint-typecheck, test, container-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
 
@@ -100,15 +114,14 @@ jobs:
           envs: GHCR_TOKEN,GITHUB_ACTOR,GITHUB_SHA
           command_timeout: 20m
           script: |
+            set -euo pipefail
             export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
-            mkdir -p ~/.docker
-            printf '{"auths":{"ghcr.io":{"auth":"%s"}}}\n' \
-              "$(printf '%s:%s' "$GITHUB_ACTOR" "$GHCR_TOKEN" | base64)" \
-              > ~/.docker/config.json
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             cd ~/Solar
             git pull --ff-only
             HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh
             REPO=ghcr.io/ianeharris
+            export HELIOS_VERSION="$GITHUB_SHA"
             build_push() {
               local ctx=$1 img=$2
               echo ">>> building $img:$GITHUB_SHA"
@@ -120,5 +133,5 @@ jobs:
             build_push adapters/octopus   helios-adapter-octopus
             build_push adapters/foxess    helios-adapter-foxess
             cd infra/compose
-            HELIOS_VERSION="$GITHUB_SHA" docker compose up -d --force-recreate
+            docker compose up -d --force-recreate
             docker compose ps
