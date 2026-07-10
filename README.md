@@ -66,6 +66,8 @@ docker compose up -d
 docker compose ps
 ```
 
+The GitHub Actions token publishes the installation's immutable image tags to GHCR with workflow-scoped `packages: write` permission. No long-lived GHCR token is required.
+
 ### Verify Phase 0 exit criteria
 
 ```bash

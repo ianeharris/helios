@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
 
   lint-typecheck:
@@ -106,7 +110,7 @@ jobs:
       - name: Build, push & deploy via SSH
         uses: appleboy/ssh-action@v1
         env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_TOKEN: ${{ github.token }}
         with:
           host: ${{ secrets.MAC_MINI_HOST }}
           username: ${{ secrets.MAC_MINI_USER }}
