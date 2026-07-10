@@ -6,7 +6,7 @@ Self-hosted home automation platform. The Bradgate deployment is the reference i
 
 Helios production runs on the M1 Mac mini (`m1-mac-mini`, Tailscale `100.127.66.15`, LAN `192.168.86.102`) via OrbStack and Docker Compose. The repo is `ianeharris/Solar` and the canonical checkout path is `~/Solar`.
 
-As of 2026-07-09, the local tree has WS-A foundation work in progress: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts, event writes, stream-backed Energy hooks and a registry-backed Rooms screen. These commits are local until pushed and deployed.
+The 10 July 2026 deployment (commit `8c30b8f`) includes the WS-A foundations: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts, event writes, stream-backed Energy hooks and a registry-backed Rooms screen. It also uses London-time Octopus scheduling, recorded-fixture adapter contracts, immutable image tags and a pre-deploy container-build gate. The live implementation status and open loops are maintained in the vault implementation plan.
 
 ## Self-hosted model
 
