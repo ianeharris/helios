@@ -89,6 +89,7 @@ jobs:
           docker build -f apps/web/Dockerfile -t helios-web:ci .
           docker build -f adapters/octopus/Dockerfile -t helios-adapter-octopus:ci .
           docker build -f adapters/foxess/Dockerfile -t helios-adapter-foxess:ci .
+          docker build -f adapters/hue/Dockerfile -t helios-adapter-hue:ci .
 
   deploy:
     name: Build on Mac mini & deploy
@@ -136,6 +137,7 @@ jobs:
             build_push apps/web           helios-web
             build_push adapters/octopus   helios-adapter-octopus
             build_push adapters/foxess    helios-adapter-foxess
+            build_push adapters/hue       helios-adapter-hue
             cd infra/compose
             docker compose up -d --force-recreate
             docker compose ps

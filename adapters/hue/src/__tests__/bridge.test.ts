@@ -21,7 +21,7 @@ vi.mock('../sse.js', () => ({
 import { fetchLights, fetchRooms, fetchGroupedLights, fetchScenes } from '../api.js';
 import { BridgeManager } from '../bridge.js';
 
-const bridge = { id: 'ECB5FAFFFE2CA569', ip: '192.168.86.199', name: 'Bradgate', appKey: 'test-key' };
+const bridge = { id: 'ECB5FAFFFE2CA569', address: '192.168.86.199', name: 'Bradgate', appKey: 'test-key' };
 
 const makeLight = (overrides: Partial<HueLightResource> = {}): HueLightResource => ({
   id: 'light-1',

@@ -34,6 +34,8 @@ sops --decrypt --extract '["grafana_admin_password"]'  "$SOPS_FILE" > "$SECRETS_
 # Phase 1+ adapter secrets (only extracted if present in secrets.yaml)
 sops --decrypt --extract '["octopus_api_key"]' "$SOPS_FILE" > "$SECRETS_DIR/octopus_api_key.txt" 2>/dev/null || true
 sops --decrypt --extract '["foxess_api_key"]'  "$SOPS_FILE" > "$SECRETS_DIR/foxess_api_key.txt"  2>/dev/null || true
+sops --decrypt --extract '["hue_app_key_bradgate"]'  "$SOPS_FILE" > "$SECRETS_DIR/hue_app_key_bradgate.txt" 2>/dev/null || true
+sops --decrypt --extract '["hue_app_key_bradgate2"]' "$SOPS_FILE" > "$SECRETS_DIR/hue_app_key_bradgate2.txt" 2>/dev/null || true
 
 # MQTT credentials — generate Mosquitto password file via container
 MQTT_PASSWD="$SCRIPT_DIR/../compose/mosquitto/passwd"

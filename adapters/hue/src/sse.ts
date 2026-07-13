@@ -67,7 +67,7 @@ export class HueSseConnection {
   private async connect(): Promise<void> {
     if (this.stopped) return;
 
-    const url = `https://${this.bridge.ip}/eventstream/clip/v2`;
+    const url = `https://${this.bridge.address}/eventstream/clip/v2`;
     console.log(`[hue/${this.bridge.name}] connecting to SSE stream at ${url}`);
 
     this.abortController = new AbortController();

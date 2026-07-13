@@ -17,7 +17,7 @@ import type { BridgeConfig } from './types.js';
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 const clip = async <T>(bridge: BridgeConfig, path: string): Promise<T> => {
-  const url = `https://${bridge.ip}/clip/v2/${path}`;
+  const url = `https://${bridge.address}/clip/v2/${path}`;
   const res = await fetch(url, {
     headers: { 'hue-application-key': bridge.appKey },
     // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
@@ -31,6 +31,18 @@ const clip = async <T>(bridge: BridgeConfig, path: string): Promise<T> => {
     throw new Error(`Hue API errors: ${JSON.stringify(body.errors)}`);
   }
   return body.data;
+};
+
+export const probeBridge = async (address: string, appKey: string): Promise<void> => {
+  const res = await fetch(`https://${address}/clip/v2/resource/bridge`, {
+    headers: { 'hue-application-key': appKey },
+    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
+    agent,
+  });
+  if (!res.ok) throw new Error(`Hue bridge probe at ${address}: HTTP ${res.status}`);
+
+  const body = (await res.json()) as { errors?: unknown[] };
+  if (body.errors?.length) throw new Error(`Hue bridge probe at ${address} returned API errors`);
 };
 
 export const fetchLights = (bridge: BridgeConfig): Promise<HueLightResource[]> =>
@@ -55,7 +67,7 @@ export const setLightState = async (
   if (state.brightness !== undefined) body['dimming'] = { brightness: state.brightness };
   if (state.colorTemp !== undefined) body['color_temperature'] = { mirek: state.colorTemp };
 
-  const url = `https://${bridge.ip}/clip/v2/resource/light/${lightId}`;
+  const url = `https://${bridge.address}/clip/v2/resource/light/${lightId}`;
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'hue-application-key': bridge.appKey, 'Content-Type': 'application/json' },
@@ -67,7 +79,7 @@ export const setLightState = async (
 };
 
 export const recallScene = async (bridge: BridgeConfig, sceneId: string): Promise<void> => {
-  const url = `https://${bridge.ip}/clip/v2/resource/scene/${sceneId}`;
+  const url = `https://${bridge.address}/clip/v2/resource/scene/${sceneId}`;
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'hue-application-key': bridge.appKey, 'Content-Type': 'application/json' },

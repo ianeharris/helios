@@ -1,11 +1,14 @@
 // Hue CLIP API v2 resource shapes (subset needed by Helios).
 // Full schema: https://developers.meethue.com/develop/hue-api-v2/
 
-export interface BridgeConfig {
+export interface ConfiguredBridge {
   id: string;         // ECB5FAFFFE... - the bridge hardware ID
-  ip: string;         // LAN IP, e.g. 192.168.86.199
   name: string;       // Human label, e.g. "Bradgate"
   appKey: string;     // hue-application-key header value
+}
+
+export interface BridgeConfig extends ConfiguredBridge {
+  address: string;    // Discovered LAN address, e.g. 192.168.86.199
 }
 
 // ── Resource types returned by /clip/v2/resource/* ───────────────────────────

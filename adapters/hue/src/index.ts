@@ -14,7 +14,7 @@
  *   helios/hue/<bridgeId>/scene/<resourceId>/recall
  *
  * Environment:
- *   HUE_BRIDGES   JSON array of {id, ip, name} - see config.ts
+ *   HUE_BRIDGES   JSON array of {id, name}; addresses come from local mDNS
  *   MQTT_URL      Internal broker (default: mqtt://mosquitto:1883)
  *
  * Secrets (Docker secrets):
@@ -23,14 +23,20 @@
 
 import { connect } from '@helios/adapter-sdk';
 import { loadConfig } from './config.js';
+import { resolveBridges } from './discovery.js';
 import { BridgeManager } from './bridge.js';
 import { setLightState, recallScene } from './api.js';
 
 const run = async (): Promise<void> => {
   const config = loadConfig();
   const runtime = await connect('hue', { mqttUrl: config.mqttUrl });
+  const bridges = await resolveBridges(
+    config.bridges,
+    config.discoveryTimeoutMs,
+    config.discoveryCachePath,
+  );
 
-  for (const bridge of config.bridges) {
+  for (const bridge of bridges) {
     await runtime.mqtt.subscribeAsync([
       `helios/hue/${bridge.id}/light/+/set`,
       `helios/hue/${bridge.id}/scene/+/recall`,
@@ -43,7 +49,7 @@ const run = async (): Promise<void> => {
     if (parts.length < 6) return;
     const [, , bridgeId, kind, resourceId, command] = parts;
 
-    const bridge = config.bridges.find((b) => b.id === bridgeId);
+    const bridge = bridges.find((b) => b.id === bridgeId);
     if (!bridge || !resourceId) return;
 
     if (kind === 'light' && command === 'set') {
@@ -69,7 +75,7 @@ const run = async (): Promise<void> => {
     }
   });
 
-  const managers = config.bridges.map(
+  const managers = bridges.map(
     (bridge) =>
       new BridgeManager(bridge, runtime.publishState, config.sseTimeoutMs, config.reconnectDelayMs),
   );

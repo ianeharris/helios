@@ -91,17 +91,23 @@ services:
     secrets:
       - foxess_api_key
 
-  # adapter-hue:
-  #   image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:?HELIOS_VERSION is required}
-  #   restart: unless-stopped
-  #   depends_on: [mosquitto]
-  #   environment:
-  #     # Two Bridge v2 units; see infra/compose/.env.example for format
-  #     HUE_BRIDGES: ${HUE_BRIDGES}
-  #     MQTT_URL: mqtt://mosquitto:1883
-  #   secrets:
-  #     - hue_app_key_bradgate
-  #     - hue_app_key_bradgate2
+  adapter-hue:
+    image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:?HELIOS_VERSION is required}
+    restart: unless-stopped
+    depends_on: [mosquitto]
+    # Host networking lets local-only mDNS discovery reach Hue Bridge v2.
+    # Mosquitto is bound to loopback on the M1 for this adapter.
+    network_mode: host
+    environment:
+      HUE_BRIDGES: >-
+        [{"id":"ECB5FAFFFE2CA569","name":"Bradgate"},{"id":"ECB5FAFFFEBE1854","name":"Bradgate 2"}]
+      HUE_DISCOVERY_CACHE_PATH: /var/lib/helios/hue-bridges.json
+      MQTT_URL: mqtt://hue:${MQTT_PASSWORD_HUE}@127.0.0.1:1883
+    volumes:
+      - hue_discovery_cache:/var/lib/helios
+    secrets:
+      - hue_app_key_bradgate
+      - hue_app_key_bradgate2
 
   # ── Web frontend ─────────────────────────────────────────────────────────────
 
@@ -184,6 +190,10 @@ secrets:
     file: ./secrets/octopus_api_key.txt
   foxess_api_key:
     file: ./secrets/foxess_api_key.txt
+  hue_app_key_bradgate:
+    file: ./secrets/hue_app_key_bradgate.txt
+  hue_app_key_bradgate2:
+    file: ./secrets/hue_app_key_bradgate2.txt
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
 
@@ -196,3 +206,4 @@ volumes:
   authelia_data:
   grafana_data:
   prometheus_data:
+  hue_discovery_cache:
