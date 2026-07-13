@@ -20,7 +20,9 @@ RUN yarn workspace @helios/adapter-octopus build
 
 FROM base AS runtime
 ENV NODE_ENV=production
+COPY --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/packages/shared/dist packages/shared/dist/
+COPY --from=build /app/packages/adapter-sdk/package.json packages/adapter-sdk/package.json
 COPY --from=build /app/packages/adapter-sdk/dist packages/adapter-sdk/dist/
 COPY --from=build /app/adapters/octopus/dist adapters/octopus/dist/
 COPY --from=deps /app/node_modules node_modules/

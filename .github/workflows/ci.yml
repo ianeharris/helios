@@ -90,6 +90,9 @@ jobs:
           docker build -f adapters/octopus/Dockerfile -t helios-adapter-octopus:ci .
           docker build -f adapters/foxess/Dockerfile -t helios-adapter-foxess:ci .
           docker build -f adapters/hue/Dockerfile -t helios-adapter-hue:ci .
+          docker run --rm --entrypoint node helios-adapter-octopus:ci -e "import('@helios/adapter-sdk')"
+          docker run --rm --entrypoint node helios-adapter-foxess:ci -e "import('@helios/adapter-sdk')"
+          docker run --rm --entrypoint node helios-adapter-hue:ci -e "import('@helios/adapter-sdk')"
 
   deploy:
     name: Build on Mac mini & deploy
