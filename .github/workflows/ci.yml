@@ -141,3 +141,12 @@ jobs:
             cd infra/compose
             docker compose up -d --force-recreate
             docker compose ps
+            sleep 10
+            running_services="$(docker compose ps --status running --services)"
+            for service in api adapter-octopus adapter-foxess adapter-hue; do
+              if ! printf '%s\n' "$running_services" | grep -qx "$service"; then
+                echo "ERROR: $service is not running after deployment" >&2
+                docker compose logs --tail=100 "$service" >&2 || true
+                exit 1
+              fi
+            done
