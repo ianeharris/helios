@@ -105,6 +105,7 @@ export const discoverHueBridgesWithRetries = async (
   timeoutMs: number,
   attempts: number,
   bridgeIds: string[],
+  retryDelayMs: number = 1_000,
   discover: HueDiscovery = discoverHueBridges,
   delay: Delay = wait,
 ): Promise<HueBridgeAdvertisement[]> => {
@@ -116,7 +117,7 @@ export const discoverHueBridgesWithRetries = async (
     advertisements = await discover(timeoutMs);
     const foundIds = new Set(advertisements.map((advertisement) => normaliseBridgeId(advertisement.id)));
     if ([...expectedIds].every((id) => foundIds.has(id))) return advertisements;
-    if (attempt < boundedAttempts) await delay(1_000);
+    if (attempt < boundedAttempts) await delay(retryDelayMs);
   }
 
   return advertisements;
@@ -156,9 +157,10 @@ export const resolveBridges = async (
   timeoutMs: number,
   cachePath: string,
   discoveryAttempts: number = 1,
+  discoveryRetryDelayMs: number = 1_000,
 ): Promise<BridgeConfig[]> => {
   const [advertisements, cache] = await Promise.all([
-    discoverHueBridgesWithRetries(timeoutMs, discoveryAttempts, bridges.map((bridge) => bridge.id)),
+    discoverHueBridgesWithRetries(timeoutMs, discoveryAttempts, bridges.map((bridge) => bridge.id), discoveryRetryDelayMs),
     readCache(cachePath),
   ]);
   const resolved: BridgeConfig[] = [];
@@ -174,7 +176,9 @@ export const resolveBridges = async (
         await probeBridge(candidate, bridge.appKey);
         address = candidate;
         break;
-      } catch {
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.warn(`[hue/${bridge.name}] bridge probe failed for ${candidate}: ${detail}`);
         // A stale cache entry or failed mDNS response must not prevent trying another candidate.
       }
     }

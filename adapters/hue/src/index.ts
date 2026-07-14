@@ -35,6 +35,7 @@ const run = async (): Promise<void> => {
     config.discoveryTimeoutMs,
     config.discoveryCachePath,
     config.discoveryAttempts,
+    config.discoveryRetryDelayMs,
   );
 
   for (const bridge of bridges) {

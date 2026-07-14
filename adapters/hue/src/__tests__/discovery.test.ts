@@ -80,7 +80,7 @@ describe('parseHueAdvertisements', () => {
       .mockResolvedValueOnce([{ id: 'ECB5FAFFFE2CA569', address: 'ecb5fa2ca569.local' }]);
     const delay = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
 
-    await expect(discoverHueBridgesWithRetries(1, 3, ['ECB5FAFFFE2CA569'], discover, delay)).resolves.toEqual([
+    await expect(discoverHueBridgesWithRetries(1, 3, ['ECB5FAFFFE2CA569'], 1, discover, delay)).resolves.toEqual([
       { id: 'ECB5FAFFFE2CA569', address: 'ecb5fa2ca569.local' },
     ]);
     expect(discover).toHaveBeenCalledTimes(2);

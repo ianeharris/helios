@@ -50,6 +50,7 @@ export interface Config {
   sseTimeoutMs: number;
   discoveryTimeoutMs: number;
   discoveryAttempts: number;
+  discoveryRetryDelayMs: number;
   discoveryCachePath: string;
 }
 
@@ -59,6 +60,7 @@ export const loadConfig = (): Config => ({
   reconnectDelayMs: Number(process.env['HUE_RECONNECT_DELAY_MS'] ?? 5000),
   sseTimeoutMs: Number(process.env['HUE_SSE_TIMEOUT_MS'] ?? 120_000),
   discoveryTimeoutMs: Number(process.env['HUE_DISCOVERY_TIMEOUT_MS'] ?? 3000),
-  discoveryAttempts: Number(process.env['HUE_DISCOVERY_ATTEMPTS'] ?? 3),
+  discoveryAttempts: Number(process.env['HUE_DISCOVERY_ATTEMPTS'] ?? 12),
+  discoveryRetryDelayMs: Number(process.env['HUE_DISCOVERY_RETRY_DELAY_MS'] ?? 5000),
   discoveryCachePath: process.env['HUE_DISCOVERY_CACHE_PATH'] ?? '/var/lib/helios/hue-bridges.json',
 });
