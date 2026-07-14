@@ -125,6 +125,7 @@ jobs:
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             cd ~/Solar
             git pull --ff-only
+            plutil -lint infra/launchd/com.helios.adapter-hue.plist
             HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh
             corepack yarn install --immutable
             corepack yarn workspace @helios/shared build
