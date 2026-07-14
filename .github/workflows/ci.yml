@@ -160,7 +160,7 @@ jobs:
                 exit 1
               fi
             done
-            if ! curl --fail --silent --show-error --retry 12 --retry-delay 2 http://127.0.0.1:9100/health; then
+            if ! curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:9100/health; then
               echo "ERROR: Hue edge agent is unhealthy after deployment" >&2
               tail -100 ~/Solar/logs/adapter-hue-error.log >&2 || true
               exit 1
