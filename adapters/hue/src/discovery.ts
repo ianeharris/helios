@@ -92,6 +92,16 @@ export const discoverHueBridges = (timeoutMs: number): Promise<HueBridgeAdvertis
     setTimeout(finish, timeoutMs).unref();
   });
 
+export const candidateAddressesForBridge = (
+  bridge: ConfiguredBridge,
+  advertisements: HueBridgeAdvertisement[],
+  cache: CachedAddresses,
+): string[] => {
+  const id = normaliseBridgeId(bridge.id);
+  const discovered = advertisements.find((candidate) => normaliseBridgeId(candidate.id) === id)?.address;
+  return [...new Set([discovered, cache[id], bridge.address].filter((candidate): candidate is string => Boolean(candidate)))];
+};
+
 const readCache = async (path: string): Promise<CachedAddresses> => {
   try {
     const parsed = JSON.parse(await readFile(path, 'utf-8')) as unknown;
@@ -122,8 +132,7 @@ export const resolveBridges = async (
 
   for (const bridge of bridges) {
     const id = normaliseBridgeId(bridge.id);
-    const discovered = advertisements.find((candidate) => normaliseBridgeId(candidate.id) === id)?.address;
-    const candidates = [...new Set([discovered, cache[id]].filter((candidate): candidate is string => Boolean(candidate)))];
+    const candidates = candidateAddressesForBridge(bridge, advertisements, cache);
     let address: string | undefined;
 
     for (const candidate of candidates) {

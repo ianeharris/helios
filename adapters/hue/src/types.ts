@@ -5,6 +5,7 @@ export interface ConfiguredBridge {
   id: string;         // ECB5FAFFFE... - the bridge hardware ID
   name: string;       // Human label, e.g. "Bradgate"
   appKey: string;     // hue-application-key header value
+  address?: string;   // Optional fallback for runtimes that cannot receive mDNS multicast
 }
 
 export interface BridgeConfig extends ConfiguredBridge {

@@ -1,8 +1,8 @@
 import { readFileSync } from 'fs';
 import type { ConfiguredBridge } from './types.js';
 
-// HUE_BRIDGES is a JSON array of {id, name} objects. Addresses are discovered
-// with local mDNS and only cached after a successful bridge probe.
+// HUE_BRIDGES is a JSON array of {id, name, address?} objects. Addresses are
+// discovered with local mDNS first, with address only used as a runtime fallback.
 // App keys come from Docker secrets files.
 const readSecret = (path: string): string => {
   try {
@@ -16,7 +16,7 @@ const parseBridges = (): ConfiguredBridge[] => {
   const raw = process.env['HUE_BRIDGES'];
   if (!raw) throw new Error('HUE_BRIDGES environment variable is required');
 
-  const bridges = JSON.parse(raw) as Array<{ id?: unknown; name?: unknown }>;
+  const bridges = JSON.parse(raw) as Array<{ id?: unknown; name?: unknown; address?: unknown }>;
   if (!Array.isArray(bridges) || bridges.length === 0) {
     throw new Error('HUE_BRIDGES must be a non-empty JSON array');
   }
@@ -31,7 +31,10 @@ const parseBridges = (): ConfiguredBridge[] => {
     if (!appKey) {
       throw new Error(`Missing app key for Hue bridge "${b.name}" (secret: ${secretName})`);
     }
-    return { id: b.id, name: b.name, appKey };
+    if (b.address !== undefined && (typeof b.address !== 'string' || !b.address.trim())) {
+      throw new Error('HUE_BRIDGES address values must be non-empty strings when provided');
+    }
+    return { id: b.id, name: b.name, appKey, ...(typeof b.address === 'string' ? { address: b.address } : {}) };
   });
 };
 

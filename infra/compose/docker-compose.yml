@@ -95,12 +95,13 @@ services:
     image: ghcr.io/ianeharris/helios-adapter-hue:${HELIOS_VERSION:?HELIOS_VERSION is required}
     restart: unless-stopped
     depends_on: [mosquitto]
-    # Host networking lets local-only mDNS discovery reach Hue Bridge v2.
-    # Mosquitto is bound to loopback on the M1 for this adapter.
+    # Host networking gives the adapter direct LAN reachability. OrbStack on
+    # macOS does not pass Hue mDNS multicast into containers, so the bridge IPs
+    # below are verified fallback candidates after discovery/cache.
     network_mode: host
     environment:
       HUE_BRIDGES: >-
-        [{"id":"ECB5FAFFFE2CA569","name":"Bradgate"},{"id":"ECB5FAFFFEBE1854","name":"Bradgate 2"}]
+        [{"id":"ECB5FAFFFE2CA569","name":"Bradgate","address":"192.168.86.199"},{"id":"ECB5FAFFFEBE1854","name":"Bradgate 2","address":"192.168.86.248"}]
       HUE_DISCOVERY_CACHE_PATH: /var/lib/helios/hue-bridges.json
       MQTT_URL: mqtt://hue:${MQTT_PASSWORD_HUE}@127.0.0.1:1883
     volumes:

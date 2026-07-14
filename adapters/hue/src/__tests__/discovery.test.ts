@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Answer } from 'dns-packet';
-import { parseHueAdvertisements } from '../discovery.js';
+import { candidateAddressesForBridge, parseHueAdvertisements } from '../discovery.js';
 
 describe('parseHueAdvertisements', () => {
   it('uses the Hue bridgeid TXT record rather than the service label', () => {
@@ -41,5 +41,35 @@ describe('parseHueAdvertisements', () => {
     expect(parseHueAdvertisements(records)).toEqual([
       { id: 'ECB5FAFFFEBE1854', address: 'ecb5fabe1854.local' },
     ]);
+  });
+
+  it('falls back to a configured address when container mDNS returns nothing', () => {
+    expect(
+      candidateAddressesForBridge(
+        {
+          id: 'ECB5FAFFFE2CA569',
+          name: 'Bradgate',
+          appKey: 'test-key',
+          address: '192.168.86.199',
+        },
+        [],
+        {},
+      ),
+    ).toEqual(['192.168.86.199']);
+  });
+
+  it('prefers discovered and cached addresses before configured fallback', () => {
+    expect(
+      candidateAddressesForBridge(
+        {
+          id: 'ECB5FAFFFE2CA569',
+          name: 'Bradgate',
+          appKey: 'test-key',
+          address: '192.168.86.199',
+        },
+        [{ id: 'ecb5fafffe2ca569', address: '192.168.86.200' }],
+        { ECB5FAFFFE2CA569: '192.168.86.201' },
+      ),
+    ).toEqual(['192.168.86.200', '192.168.86.201', '192.168.86.199']);
   });
 });
