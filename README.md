@@ -18,8 +18,7 @@ The Helios core, database, MQTT broker, web application and cloud-facing adapter
 
 The M1 conformance check found that OrbStack is not a supported LAN runtime for Hue at Bradgate: the macOS host can browse `_hue._tcp.local` and reach both bridges over HTTPS, while the Hue container cannot do so even with Docker host networking. Hue therefore runs as a native macOS `launchd` edge agent, publishing to the containerised Mosquitto broker. This is the supported model for later LAN integrations such as Sonos, Hikvision and Texecom unless their capability checks prove container operation reliable.
 
-The native agent uses macOS Bonjour (`dns-sd`), immutable Hue Bridge IDs, encrypted application keys and a verified-address cache. The host-side TCP proxy experiment is not production architecture and is deliberately excluded from deployment. The activation path is being hardened for intermittent first-launch discovery; direct native discovery and authenticated probes against both Bradgate bridges are verified.
-
+The native agent uses macOS Bonjour (`dns-sd`), immutable Hue Bridge IDs, encrypted application keys and a verified-address cache. The host-side TCP proxy experiment is not production architecture and is deliberately excluded from deployment. The M1 health endpoint and native Hue-to-MQTT connection are verified after restart-recovery hardening; direct native discovery and authenticated probes against both Bradgate bridges also pass.
 
 ## Mac mini setup checklist
 
