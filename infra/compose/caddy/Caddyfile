@@ -1,4 +1,4 @@
-helios.lan, m1-mac-mini.tailfc238d.ts.net {
+helios.lan, helios.ian, m1-mac-mini.tailfc238d.ts.net {
     tls internal
 
     header {
