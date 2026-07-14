@@ -24,7 +24,7 @@ helios.lan, helios.ian, m1-mac-mini.tailfc238d.ts.net {
     handle /locales* {
         reverse_proxy authelia:9091
     }
-    handle /api/configuration/* {
+    handle /api/configuration* {
         reverse_proxy authelia:9091
     }
     handle /api/verify* {
