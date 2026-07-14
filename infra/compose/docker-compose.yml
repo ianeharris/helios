@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./authelia/configuration.yml:/config/configuration.yml:ro
-      - ./authelia/users_database.yml:/config/users_database.yml:ro
+      - ./authelia/users_database.yml:/config/users_database.yml
       - authelia_data:/config
     secrets:
       - authelia_jwt_secret
