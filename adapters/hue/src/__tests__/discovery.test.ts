@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Answer } from 'dns-packet';
-import { candidateAddressesForBridge, parseHueAdvertisements } from '../discovery.js';
+import { candidateAddressesForBridge, discoverHueBridgesWithRetries, parseHueAdvertisements } from '../discovery.js';
+import type { HueBridgeAdvertisement } from '../bonjour.js';
 
 describe('parseHueAdvertisements', () => {
   it('uses the Hue bridgeid TXT record rather than the service label', () => {
@@ -71,5 +72,18 @@ describe('parseHueAdvertisements', () => {
         { ECB5FAFFFE2CA569: '192.168.86.201' },
       ),
     ).toEqual(['192.168.86.200', '192.168.86.201', '192.168.86.199']);
+  });
+
+  it('retries Bonjour discovery until every configured bridge is present', async (): Promise<void> => {
+    const discover = vi.fn<(timeoutMs: number) => Promise<HueBridgeAdvertisement[]>>()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'ECB5FAFFFE2CA569', address: 'ecb5fa2ca569.local' }]);
+    const delay = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+
+    await expect(discoverHueBridgesWithRetries(1, 3, ['ECB5FAFFFE2CA569'], discover, delay)).resolves.toEqual([
+      { id: 'ECB5FAFFFE2CA569', address: 'ecb5fa2ca569.local' },
+    ]);
+    expect(discover).toHaveBeenCalledTimes(2);
+    expect(delay).toHaveBeenCalledOnce();
   });
 });

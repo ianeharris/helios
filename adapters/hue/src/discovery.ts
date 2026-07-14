@@ -15,6 +15,12 @@ const HUE_SERVICE = '_hue._tcp.local';
 
 type CachedAddresses = Record<string, string>;
 
+type HueDiscovery = (timeoutMs: number) => Promise<HueBridgeAdvertisement[]>;
+type Delay = (milliseconds: number) => Promise<void>;
+
+const wait = (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 interface DnsRecord {
   name: string;
   type: string;
@@ -94,6 +100,28 @@ export const discoverHueBridges = (timeoutMs: number): Promise<HueBridgeAdvertis
     ? discoverHueBridgesWithBonjour(timeoutMs)
     : discoverHueBridgesWithMdns(timeoutMs);
 
+
+export const discoverHueBridgesWithRetries = async (
+  timeoutMs: number,
+  attempts: number,
+  bridgeIds: string[],
+  discover: HueDiscovery = discoverHueBridges,
+  delay: Delay = wait,
+): Promise<HueBridgeAdvertisement[]> => {
+  const expectedIds = new Set(bridgeIds.map(normaliseBridgeId));
+  const boundedAttempts = Math.max(1, attempts);
+  let advertisements: HueBridgeAdvertisement[] = [];
+
+  for (let attempt = 1; attempt <= boundedAttempts; attempt += 1) {
+    advertisements = await discover(timeoutMs);
+    const foundIds = new Set(advertisements.map((advertisement) => normaliseBridgeId(advertisement.id)));
+    if ([...expectedIds].every((id) => foundIds.has(id))) return advertisements;
+    if (attempt < boundedAttempts) await delay(1_000);
+  }
+
+  return advertisements;
+};
+
 export const candidateAddressesForBridge = (
   bridge: ConfiguredBridge,
   advertisements: HueBridgeAdvertisement[],
@@ -127,8 +155,12 @@ export const resolveBridges = async (
   bridges: ConfiguredBridge[],
   timeoutMs: number,
   cachePath: string,
+  discoveryAttempts: number = 1,
 ): Promise<BridgeConfig[]> => {
-  const [advertisements, cache] = await Promise.all([discoverHueBridges(timeoutMs), readCache(cachePath)]);
+  const [advertisements, cache] = await Promise.all([
+    discoverHueBridgesWithRetries(timeoutMs, discoveryAttempts, bridges.map((bridge) => bridge.id)),
+    readCache(cachePath),
+  ]);
   const resolved: BridgeConfig[] = [];
   const nextCache = { ...cache };
 

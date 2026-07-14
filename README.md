@@ -12,6 +12,15 @@ The 10 July 2026 deployment (commit `8c30b8f`) includes the WS-A foundations: sh
 
 Helios is one private household installation per deployment. Device access, vendor credentials, room data and automation rules remain inside that household's own network and encrypted configuration. The core is designed to be portable, but packaged distribution is a later milestone after the Bradgate reference installation is a trusted daily driver.
 
+## LAN Edge Runtime
+
+The Helios core, database, MQTT broker, web application and cloud-facing adapters run in Docker Compose on OrbStack. LAN adapters use the same MQTT and adapter-SDK contracts, but their runtime is selected by required network capabilities: unicast device access, mDNS, SSDP, inbound callbacks and restart recovery.
+
+The M1 conformance check found that OrbStack is not a supported LAN runtime for Hue at Bradgate: the macOS host can browse `_hue._tcp.local` and reach both bridges over HTTPS, while the Hue container cannot do so even with Docker host networking. Hue therefore runs as a native macOS `launchd` edge agent, publishing to the containerised Mosquitto broker. This is the supported model for later LAN integrations such as Sonos, Hikvision and Texecom unless their capability checks prove container operation reliable.
+
+The native agent uses macOS Bonjour (`dns-sd`), immutable Hue Bridge IDs, encrypted application keys and a verified-address cache. The host-side TCP proxy experiment is not production architecture and is deliberately excluded from deployment. The activation path is being hardened for intermittent first-launch discovery; direct native discovery and authenticated probes against both Bradgate bridges are verified.
+
+
 ## Mac mini setup checklist
 
 ### Prerequisites
