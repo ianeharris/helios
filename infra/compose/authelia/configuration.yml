@@ -7,6 +7,10 @@ log:
 
 jwt_secret: "{{ secret '/run/secrets/authelia_jwt_secret' }}"
 
+identity_validation:
+  reset_password:
+    jwt_lifespan: 30m
+
 authentication_backend:
   file:
     path: /config/users_database.yml
