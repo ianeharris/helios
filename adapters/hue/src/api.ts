@@ -16,33 +16,75 @@ import type { BridgeConfig } from './types.js';
 
 const agent = new https.Agent({ rejectUnauthorized: false });
 
-const clip = async <T>(bridge: BridgeConfig, path: string): Promise<T> => {
-  const url = `https://${bridge.address}/clip/v2/${path}`;
-  const res = await fetch(url, {
-    headers: { 'hue-application-key': bridge.appKey },
-    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
-    agent,
+interface HueApiResponse<T> {
+  data: T;
+  errors?: unknown[];
+}
+
+interface HueRequestOptions {
+  method?: 'GET' | 'PUT';
+  body?: Record<string, unknown>;
+}
+
+// Node's global fetch ignores node:https Agent instances. Use https.request so
+// the Hue bridge's self-signed certificate is accepted only for these LAN calls.
+const requestHueApi = <T>(
+  address: string,
+  appKey: string,
+  path: string,
+  options: HueRequestOptions = {},
+): Promise<{ statusCode: number; body: HueApiResponse<T> }> =>
+  new Promise((resolve, reject) => {
+    const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+    const request = https.request({
+      hostname: address,
+      port: 443,
+      path: `/clip/v2/${path}`,
+      method: options.method ?? 'GET',
+      headers: {
+        'hue-application-key': appKey,
+        ...(body === undefined ? {} : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }),
+      },
+      agent,
+    }, (response) => {
+      let payload = '';
+      response.setEncoding('utf-8');
+      response.on('data', (chunk: string) => { payload += chunk; });
+      response.once('error', reject);
+      response.once('end', () => {
+        try {
+          resolve({
+            statusCode: response.statusCode ?? 0,
+            body: JSON.parse(payload) as HueApiResponse<T>,
+          });
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+    });
+
+    request.once('error', reject);
+    if (body !== undefined) request.write(body);
+    request.end();
   });
-  if (!res.ok) {
-    throw new Error(`Hue API ${bridge.name} ${path}: HTTP ${res.status}`);
+
+const clip = async <T>(bridge: BridgeConfig, path: string): Promise<T> => {
+  const res = await requestHueApi<T>(bridge.address, bridge.appKey, path);
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    throw new Error(`Hue API ${bridge.name} ${path}: HTTP ${res.statusCode}`);
   }
-  const body = (await res.json()) as { data: T; errors: unknown[] };
-  if (body.errors?.length) {
-    throw new Error(`Hue API errors: ${JSON.stringify(body.errors)}`);
+  if (res.body.errors?.length) {
+    throw new Error(`Hue API errors: ${JSON.stringify(res.body.errors)}`);
   }
-  return body.data;
+  return res.body.data;
 };
 
 export const probeBridge = async (address: string, appKey: string): Promise<void> => {
-  const res = await fetch(`https://${address}/clip/v2/resource/bridge`, {
-    headers: { 'hue-application-key': appKey },
-    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
-    agent,
-  });
-  if (!res.ok) throw new Error(`Hue bridge probe at ${address}: HTTP ${res.status}`);
-
-  const body = (await res.json()) as { errors?: unknown[] };
-  if (body.errors?.length) throw new Error(`Hue bridge probe at ${address} returned API errors`);
+  const res = await requestHueApi<unknown>(address, appKey, 'resource/bridge');
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    throw new Error(`Hue bridge probe at ${address}: HTTP ${res.statusCode}`);
+  }
+  if (res.body.errors?.length) throw new Error(`Hue bridge probe at ${address} returned API errors`);
 };
 
 export const fetchLights = (bridge: BridgeConfig): Promise<HueLightResource[]> =>
@@ -67,25 +109,21 @@ export const setLightState = async (
   if (state.brightness !== undefined) body['dimming'] = { brightness: state.brightness };
   if (state.colorTemp !== undefined) body['color_temperature'] = { mirek: state.colorTemp };
 
-  const url = `https://${bridge.address}/clip/v2/resource/light/${lightId}`;
-  const res = await fetch(url, {
+  const res = await requestHueApi<unknown>(bridge.address, bridge.appKey, `resource/light/${lightId}`, {
     method: 'PUT',
-    headers: { 'hue-application-key': bridge.appKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
-    agent,
+    body,
   });
-  if (!res.ok) throw new Error(`Set light ${lightId} failed: HTTP ${res.status}`);
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    throw new Error(`Set light ${lightId} failed: HTTP ${res.statusCode}`);
+  }
 };
 
 export const recallScene = async (bridge: BridgeConfig, sceneId: string): Promise<void> => {
-  const url = `https://${bridge.address}/clip/v2/resource/scene/${sceneId}`;
-  const res = await fetch(url, {
+  const res = await requestHueApi<unknown>(bridge.address, bridge.appKey, `resource/scene/${sceneId}`, {
     method: 'PUT',
-    headers: { 'hue-application-key': bridge.appKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recall: { action: 'active' } }),
-    // @ts-expect-error: undici agent not in global fetch types, works at runtime on Node.js
-    agent,
+    body: { recall: { action: 'active' } },
   });
-  if (!res.ok) throw new Error(`Recall scene ${sceneId} failed: HTTP ${res.status}`);
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    throw new Error(`Recall scene ${sceneId} failed: HTTP ${res.statusCode}`);
+  }
 };
