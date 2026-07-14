@@ -6,15 +6,12 @@
 import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import makeMdns from 'multicast-dns';
+import { discoverHueBridgesWithBonjour, type HueBridgeAdvertisement } from './bonjour.js';
 import { probeBridge } from './api.js';
 import type { BridgeConfig, ConfiguredBridge } from './types.js';
 
 const HUE_SERVICE = '_hue._tcp.local';
 
-export interface HueBridgeAdvertisement {
-  id: string;
-  address: string;
-}
 
 type CachedAddresses = Record<string, string>;
 
@@ -72,7 +69,7 @@ export const parseHueAdvertisements = (records: DnsRecord[]): HueBridgeAdvertise
   });
 };
 
-export const discoverHueBridges = (timeoutMs: number): Promise<HueBridgeAdvertisement[]> =>
+const discoverHueBridgesWithMdns = (timeoutMs: number): Promise<HueBridgeAdvertisement[]> =>
   new Promise((resolve) => {
     const mdns = makeMdns();
     const records: DnsRecord[] = [];
@@ -91,6 +88,11 @@ export const discoverHueBridges = (timeoutMs: number): Promise<HueBridgeAdvertis
     mdns.query({ questions: [{ name: HUE_SERVICE, type: 'PTR' }] });
     setTimeout(finish, timeoutMs).unref();
   });
+
+export const discoverHueBridges = (timeoutMs: number): Promise<HueBridgeAdvertisement[]> =>
+  process.platform === 'darwin'
+    ? discoverHueBridgesWithBonjour(timeoutMs)
+    : discoverHueBridgesWithMdns(timeoutMs);
 
 export const candidateAddressesForBridge = (
   bridge: ConfiguredBridge,
