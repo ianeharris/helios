@@ -89,10 +89,8 @@ jobs:
           docker build -f apps/web/Dockerfile -t helios-web:ci .
           docker build -f adapters/octopus/Dockerfile -t helios-adapter-octopus:ci .
           docker build -f adapters/foxess/Dockerfile -t helios-adapter-foxess:ci .
-          docker build -f adapters/hue/Dockerfile -t helios-adapter-hue:ci .
           docker run --rm --entrypoint node helios-adapter-octopus:ci -e "import('@helios/adapter-sdk')"
           docker run --rm --entrypoint node helios-adapter-foxess:ci -e "import('@helios/adapter-sdk')"
-          docker run --rm --entrypoint node helios-adapter-hue:ci -e "import('@helios/adapter-sdk')"
 
   deploy:
     name: Build on Mac mini & deploy
@@ -123,11 +121,15 @@ jobs:
           command_timeout: 20m
           script: |
             set -euo pipefail
-            export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+            export PATH="/opt/homebrew/opt/node@22/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             cd ~/Solar
             git pull --ff-only
             HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh
+            corepack yarn install --immutable
+            corepack yarn workspace @helios/shared build
+            corepack yarn workspace @helios/adapter-sdk build
+            corepack yarn workspace @helios/adapter-hue build
             REPO=ghcr.io/ianeharris
             export HELIOS_VERSION="$GITHUB_SHA"
             build_push() {
@@ -140,16 +142,26 @@ jobs:
             build_push apps/web           helios-web
             build_push adapters/octopus   helios-adapter-octopus
             build_push adapters/foxess    helios-adapter-foxess
-            build_push adapters/hue       helios-adapter-hue
             cd infra/compose
-            docker compose up -d --force-recreate
+            docker compose up -d --force-recreate --remove-orphans
+            mkdir -p ~/Library/LaunchAgents "$HOME/Library/Application Support/Helios" ~/Solar/logs
+            launchctl bootout "gui/$UID/com.helios.hue-proxy" 2>/dev/null || true
+            launchctl bootout "gui/$UID/com.helios.adapter-hue" 2>/dev/null || true
+            cp ../launchd/com.helios.adapter-hue.plist ~/Library/LaunchAgents/com.helios.adapter-hue.plist
+            launchctl bootstrap "gui/$UID" ~/Library/LaunchAgents/com.helios.adapter-hue.plist
+            launchctl kickstart -k "gui/$UID/com.helios.adapter-hue"
             docker compose ps
             sleep 10
             running_services="$(docker compose ps --status running --services)"
-            for service in api adapter-octopus adapter-foxess adapter-hue; do
+            for service in api adapter-octopus adapter-foxess; do
               if ! printf '%s\n' "$running_services" | grep -qx "$service"; then
                 echo "ERROR: $service is not running after deployment" >&2
                 docker compose logs --tail=100 "$service" >&2 || true
                 exit 1
               fi
             done
+            if ! curl --fail --silent --show-error --retry 5 --retry-delay 2 http://127.0.0.1:9100/health; then
+              echo "ERROR: Hue edge agent is unhealthy after deployment" >&2
+              tail -100 ~/Solar/logs/adapter-hue-error.log >&2 || true
+              exit 1
+            fi

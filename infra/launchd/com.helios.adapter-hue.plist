@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.helios.adapter-hue</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ian/Solar/infra/scripts/run-hue-adapter.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/ian/Solar</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HUE_BRIDGES</key>
+        <string>[{"id":"ECB5FAFFFE2CA569","name":"Bradgate"},{"id":"ECB5FAFFFEBE1854","name":"Bradgate 2"}]</string>
+        <key>HUE_SECRETS_DIR</key>
+        <string>/Users/ian/Solar/infra/compose/secrets</string>
+        <key>HUE_DISCOVERY_CACHE_PATH</key>
+        <string>/Users/ian/Library/Application Support/Helios/hue-bridges.json</string>
+        <key>ADAPTER_HEALTH_PORT</key>
+        <string>9100</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/ian/Solar/logs/adapter-hue.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/ian/Solar/logs/adapter-hue-error.log</string>
+</dict>
+</plist>

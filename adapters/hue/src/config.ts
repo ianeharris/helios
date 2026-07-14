@@ -1,9 +1,11 @@
 import { readFileSync } from 'fs';
+import { join } from 'path';
 import type { ConfiguredBridge } from './types.js';
 
 // HUE_BRIDGES is a JSON array of {id, name, address?} objects. Addresses are
 // discovered with local mDNS first, with address only used as a runtime fallback.
-// App keys come from Docker secrets files.
+// App keys come from Docker secrets by default, or a host-managed directory
+// when this adapter is running as a native LAN edge agent.
 const readSecret = (path: string): string => {
   try {
     return readFileSync(path, 'utf-8').trim();
@@ -21,13 +23,16 @@ const parseBridges = (): ConfiguredBridge[] => {
     throw new Error('HUE_BRIDGES must be a non-empty JSON array');
   }
 
+  const secretsDir = process.env['HUE_SECRETS_DIR'] ?? '/run/secrets';
+
   return bridges.map((b) => {
     if (typeof b.id !== 'string' || !b.id.trim() || typeof b.name !== 'string' || !b.name.trim()) {
       throw new Error('Each HUE_BRIDGES entry must contain non-empty id and name strings');
     }
-    // Secret file path: /run/secrets/hue_app_key_<name_lowercased_nospaces>
+    // Secret file name: hue_app_key_<name_lowercased_nospaces>
     const secretName = `hue_app_key_${b.name.toLowerCase().replace(/\s+/g, '')}`;
-    const appKey = readSecret(`/run/secrets/${secretName}`);
+    const appKey = readSecret(join(secretsDir, secretName))
+      || readSecret(join(secretsDir, `${secretName}.txt`));
     if (!appKey) {
       throw new Error(`Missing app key for Hue bridge "${b.name}" (secret: ${secretName})`);
     }
