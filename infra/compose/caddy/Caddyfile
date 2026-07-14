@@ -13,6 +13,11 @@ helios.lan, helios.ian, m1-mac-mini.tailfc238d.ts.net {
     handle /auth* {
         reverse_proxy authelia:9091
     }
+
+    # Authelia's password-reset page must also be reachable before login.
+    handle /reset-password* {
+        reverse_proxy authelia:9091
+    }
     handle /static/* {
         reverse_proxy authelia:9091
     }
