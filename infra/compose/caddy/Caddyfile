@@ -45,7 +45,7 @@ helios.lan, helios.ian, m1-mac-mini.tailfc238d.ts.net {
     handle /api/logout {
         reverse_proxy authelia:9091
     }
-    handle /api/reset-password/* {
+    handle /api/reset-password* {
         reverse_proxy authelia:9091
     }
     handle /api/oidc/* {
