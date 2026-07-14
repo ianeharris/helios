@@ -41,7 +41,7 @@ type RegistryState = {
 
 const loadJson = async <T,>(path: string): Promise<T> => {
   const response = await fetch(path);
-  if (!response.ok) throw new Error(`Failed to load ${path}`);
+  if (!response.ok) throw new Error(`${path} returned ${response.status}`);
   return response.json() as Promise<T>;
 };
 
@@ -63,9 +63,10 @@ const recallScene = async (roomId: string, sceneId: string): Promise<void> => {
   if (!response.ok) throw new Error('scene recall failed');
 };
 
-const useRegistry = (): { state: RegistryState; status: LoadStatus; reload: () => void } => {
+const useRegistry = (): { state: RegistryState; status: LoadStatus; error: string | null; reload: () => void } => {
   const [state, setState] = useState<RegistryState>({ rooms: [], devices: [], scenes: [] });
   const [status, setStatus] = useState<LoadStatus>('loading');
+  const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -73,6 +74,7 @@ const useRegistry = (): { state: RegistryState; status: LoadStatus; reload: () =
 
     const load = async (): Promise<void> => {
       setStatus('loading');
+      setError(null);
       try {
         const [rooms, devices, scenes] = await Promise.all([
           loadJson<Room[]>('/api/rooms'),
@@ -83,8 +85,11 @@ const useRegistry = (): { state: RegistryState; status: LoadStatus; reload: () =
           setState({ rooms, devices, scenes });
           setStatus('ok');
         }
-      } catch {
-        if (!cancelled) setStatus('error');
+      } catch (error) {
+        if (!cancelled) {
+          setError(error instanceof Error ? error.message : 'Unknown registry error');
+          setStatus('error');
+        }
       }
     };
 
@@ -94,7 +99,7 @@ const useRegistry = (): { state: RegistryState; status: LoadStatus; reload: () =
     };
   }, [reloadToken]);
 
-  return { state, status, reload: () => setReloadToken((value) => value + 1) };
+  return { state, status, error, reload: () => setReloadToken((value) => value + 1) };
 };
 
 const roomSort = (a: Room, b: Room): number => {
@@ -205,7 +210,7 @@ const RoomCard = ({
 };
 
 export const Rooms = (): JSX.Element => {
-  const { state, status, reload } = useRegistry();
+  const { state, status, error, reload } = useRegistry();
   const rooms = useMemo(() => [...state.rooms].sort(roomSort), [state.rooms]);
 
   return (
@@ -224,7 +229,7 @@ export const Rooms = (): JSX.Element => {
         <p className="text-sm text-slate-500">Loading rooms…</p>
       )}
       {status === 'error' && (
-        <p className="rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">Could not load room registry.</p>
+        <p className="rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">Could not load room registry: {error ?? 'unknown error'}.</p>
       )}
       {status === 'ok' && rooms.length === 0 && (
         <p className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm text-slate-500">No rooms discovered yet.</p>

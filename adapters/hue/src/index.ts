@@ -29,7 +29,7 @@ import { setLightState, recallScene } from './api.js';
 
 const run = async (): Promise<void> => {
   const config = loadConfig();
-  const runtime = await connect('hue', { mqttUrl: config.mqttUrl });
+  const runtime = await connect('hue', { mqttUrl: config.mqttUrl, initiallyReady: false });
   const bridges = await resolveBridges(
     config.bridges,
     config.discoveryTimeoutMs,
@@ -82,6 +82,7 @@ const run = async (): Promise<void> => {
   );
 
   await Promise.all(managers.map((m) => m.start()));
+  runtime.setReady();
   console.log(`[hue] all ${managers.length} bridge(s) running`);
 
   runtime.onShutdown(() => {

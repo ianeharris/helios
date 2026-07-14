@@ -13,6 +13,7 @@ type ShutdownHandler = () => void | Promise<void>;
 export type AdapterRuntime = {
   name: string;
   mqtt: MqttClient;
+  setReady: (ready?: boolean) => void;
   publishState: (topic: string, payload: unknown) => Promise<void>;
   publishEvent: (topic: string, payload: unknown) => Promise<void>;
   markError: () => void;
@@ -25,6 +26,7 @@ export type AdapterConnectOptions = {
   clientId?: string;
   healthPort?: number;
   mqttOptions?: IClientOptions;
+  initiallyReady?: boolean;
 };
 
 const DEFAULT_HEALTH_PORT = 9100;
@@ -96,7 +98,16 @@ export const connect = async (
     console.error(`[${name}] MQTT error:`, err);
   });
 
-  const server = createHealthServer(name, registry, () => mqttClient.connected);
+  let ready = options.initiallyReady ?? true;
+  const adapterReady = new Gauge({
+    name: 'helios_adapter_ready',
+    help: 'Whether the adapter has completed its vendor-specific startup work',
+    labelNames: ['adapter'],
+    registers: [registry],
+  });
+  adapterReady.set({ adapter: name }, ready ? 1 : 0);
+
+  const server = createHealthServer(name, registry, () => mqttClient.connected, () => ready);
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(healthPort, '0.0.0.0', () => {
@@ -116,6 +127,10 @@ export const connect = async (
 
   const runtime: AdapterRuntime = {
     name,
+    setReady: (nextReady = true) => {
+      ready = nextReady;
+      adapterReady.set({ adapter: name }, ready ? 1 : 0);
+    },
     mqtt: mqttClient,
     publishState: (topic, payload) => publish(topic, payload, true),
     publishEvent: (topic, payload) => publish(topic, payload, false),
@@ -149,16 +164,31 @@ export const connect = async (
   return runtime;
 };
 
+export type AdapterHealth = {
+  status: 'ok' | 'starting' | 'degraded';
+  adapter: string;
+  mqtt: 'ok' | 'down';
+  ready: boolean;
+};
+
+export const adapterHealth = (name: string, mqttConnected: boolean, ready: boolean): AdapterHealth => ({
+  status: mqttConnected && ready ? 'ok' : (mqttConnected ? 'starting' : 'degraded'),
+  adapter: name,
+  mqtt: mqttConnected ? 'ok' : 'down',
+  ready,
+});
+
 const createHealthServer = (
   name: string,
   registry: Registry,
   isBrokerConnected: () => boolean,
+  isReady: () => boolean,
 ): Server =>
   createServer((req, res) => {
     if (req.url === '/health') {
-      const ok = isBrokerConnected();
-      res.writeHead(ok ? 200 : 503, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ status: ok ? 'ok' : 'degraded', adapter: name, mqtt: ok ? 'ok' : 'down' }));
+      const health = adapterHealth(name, isBrokerConnected(), isReady());
+      res.writeHead(health.status === 'ok' ? 200 : 503, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(health));
       return;
     }
 

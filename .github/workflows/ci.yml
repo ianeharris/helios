@@ -165,3 +165,18 @@ jobs:
               tail -100 ~/Solar/logs/adapter-hue-error.log >&2 || true
               exit 1
             fi
+            for endpoint in rooms devices; do
+              registry="[]"
+              for attempt in $(seq 1 12); do
+                registry="$(curl --fail --silent --show-error http://127.0.0.1:3000/$endpoint)"
+                if [ "$registry" != "[]" ]; then
+                  break
+                fi
+                sleep 2
+              done
+              if [ "$registry" = "[]" ]; then
+                echo "ERROR: Hue edge agent did not populate /$endpoint after deployment" >&2
+                tail -100 ~/Solar/logs/adapter-hue-error.log >&2 || true
+                exit 1
+              fi
+            done
