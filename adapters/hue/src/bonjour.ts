@@ -26,6 +26,10 @@ export const parseBonjourLookup = (output: string): HueBridgeAdvertisement | und
 
   return address && id ? { id, address } : undefined;
 };
+export const parseBonjourIpv4Lookup = (output: string): string | undefined =>
+  output
+    .match(/\b(\d{1,3}(?:\.\d{1,3}){3})\s+\d+\s*$/m)?.[1];
+
 
 const collectBonjourOutput = (args: string[], timeoutMs: number): Promise<string> =>
   new Promise((resolve) => {
@@ -63,5 +67,14 @@ export const discoverHueBridgesWithBonjour = async (
       )),
   );
 
-  return lookups.filter((lookup): lookup is HueBridgeAdvertisement => Boolean(lookup));
+  const advertisements = lookups.filter((lookup): lookup is HueBridgeAdvertisement => Boolean(lookup));
+  const addressTimeoutMs = Math.max(1_000, Math.floor(timeoutMs / advertisements.length));
+  if (advertisements.length === 0) return [];
+
+  return Promise.all(advertisements.map(async (advertisement) => {
+    const ipv4 = parseBonjourIpv4Lookup(
+      await collectBonjourOutput(['-G', 'v4', advertisement.address], addressTimeoutMs),
+    );
+    return { ...advertisement, address: ipv4 ?? advertisement.address };
+  }));
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBonjourBrowse, parseBonjourLookup } from '../bonjour.js';
+import { parseBonjourBrowse, parseBonjourIpv4Lookup, parseBonjourLookup } from '../bonjour.js';
 
 describe('macOS Bonjour discovery', () => {
   it('extracts Hue service names from the system browser output', () => {
@@ -18,4 +18,11 @@ describe('macOS Bonjour discovery', () => {
       address: 'ecb5fa2ca569.local',
     });
   });
+  it('extracts a numeric IPv4 address from a system address lookup', () => {
+    expect(parseBonjourIpv4Lookup([
+      'Timestamp     A/R  Flags         IF  Hostname                               Address                                      TTL',
+      '15:59:41.834  Add  40000002       6  ecb5fa2ca569.local.                    192.168.86.199                               120',
+    ].join('\n'))).toBe('192.168.86.199');
+  });
+
 });
