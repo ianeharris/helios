@@ -5,12 +5,13 @@
  * CLIP API v2. Publishes device state to the internal MQTT bus on topics:
  *
  *   helios/hue/<bridgeId>/light/<resourceId>   - HueLightState (retained)
- *   helios/hue/<bridgeId>/room/<resourceId>    - HueRoomState (retained)
+ *   helios/hue/<bridgeId>/room/<resourceId>    - Hue Room or Zone state (retained)
  *   helios/hue/<bridgeId>/scene/<resourceId>   - scene metadata (retained)
  *
  * Subscribes to command topics:
  *
  *   helios/hue/<bridgeId>/light/<resourceId>/set  - { on?, brightness?, colorTemp? }
+ *   helios/hue/<bridgeId>/room/<resourceId>/set   - { on?, brightness? }
  *   helios/hue/<bridgeId>/scene/<resourceId>/recall
  *
  * Environment:
@@ -25,7 +26,7 @@ import { connect } from '@helios/adapter-sdk';
 import { loadConfig } from './config.js';
 import { resolveBridges } from './discovery.js';
 import { BridgeManager } from './bridge.js';
-import { setLightState, recallScene } from './api.js';
+import { setGroupedLightState, setLightState, recallScene } from './api.js';
 
 const run = async (): Promise<void> => {
   const config = loadConfig();
@@ -41,6 +42,7 @@ const run = async (): Promise<void> => {
   for (const bridge of bridges) {
     await runtime.mqtt.subscribeAsync([
       `helios/hue/${bridge.id}/light/+/set`,
+      `helios/hue/${bridge.id}/room/+/set`,
       `helios/hue/${bridge.id}/scene/+/recall`,
     ]);
   }
@@ -54,16 +56,17 @@ const run = async (): Promise<void> => {
     const bridge = bridges.find((b) => b.id === bridgeId);
     if (!bridge || !resourceId) return;
 
-    if (kind === 'light' && command === 'set') {
+    if ((kind === 'light' || kind === 'room') && command === 'set') {
       try {
         const state = JSON.parse(payload.toString()) as {
           on?: boolean;
           brightness?: number;
           colorTemp?: number;
         };
-        void setLightState(bridge, resourceId, state).catch((err) => {
+        const setState = kind === 'light' ? setLightState : setGroupedLightState;
+        void setState(bridge, resourceId, state).catch((err) => {
           runtime.markError();
-          console.error(`[hue/${bridge.name}] setLightState error:`, err);
+          console.error(`[hue/${bridge.name}] set ${kind} state error:`, err);
         });
       } catch {
         runtime.markError();

@@ -17,6 +17,7 @@ type CachedAddresses = Record<string, string>;
 
 type HueDiscovery = (timeoutMs: number) => Promise<HueBridgeAdvertisement[]>;
 type Delay = (milliseconds: number) => Promise<void>;
+type BridgeProbe = (address: string, appKey: string) => Promise<void>;
 
 const wait = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -158,6 +159,8 @@ export const resolveBridges = async (
   cachePath: string,
   discoveryAttempts: number = 1,
   discoveryRetryDelayMs: number = 1_000,
+  probe: BridgeProbe = probeBridge,
+  delay: Delay = wait,
 ): Promise<BridgeConfig[]> => {
   const [advertisements, cache] = await Promise.all([
     discoverHueBridgesWithRetries(timeoutMs, discoveryAttempts, bridges.map((bridge) => bridge.id), discoveryRetryDelayMs),
@@ -170,17 +173,21 @@ export const resolveBridges = async (
     const id = normaliseBridgeId(bridge.id);
     const candidates = candidateAddressesForBridge(bridge, advertisements, cache);
     let address: string | undefined;
+    const boundedProbeAttempts = Math.max(1, discoveryAttempts);
 
-    for (const candidate of candidates) {
-      try {
-        await probeBridge(candidate, bridge.appKey);
-        address = candidate;
-        break;
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        console.warn(`[hue/${bridge.name}] bridge probe failed for ${candidate}: ${detail}`);
-        // A stale cache entry or failed mDNS response must not prevent trying another candidate.
+    for (let attempt = 1; attempt <= boundedProbeAttempts && !address; attempt += 1) {
+      for (const candidate of candidates) {
+        try {
+          await probe(candidate, bridge.appKey);
+          address = candidate;
+          break;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          console.warn(`[hue/${bridge.name}] bridge probe failed for ${candidate}: ${detail}`);
+          // A stale cache entry or failed mDNS response must not prevent trying another candidate.
+        }
       }
+      if (!address && attempt < boundedProbeAttempts) await delay(discoveryRetryDelayMs);
     }
 
     if (!address) {

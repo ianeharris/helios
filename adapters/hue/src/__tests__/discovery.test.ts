@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Answer } from 'dns-packet';
-import { candidateAddressesForBridge, discoverHueBridgesWithRetries, parseHueAdvertisements } from '../discovery.js';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { candidateAddressesForBridge, discoverHueBridgesWithRetries, parseHueAdvertisements, resolveBridges } from '../discovery.js';
 import type { HueBridgeAdvertisement } from '../bonjour.js';
 
 describe('parseHueAdvertisements', () => {
@@ -85,5 +88,55 @@ describe('parseHueAdvertisements', () => {
     ]);
     expect(discover).toHaveBeenCalledTimes(2);
     expect(delay).toHaveBeenCalledOnce();
+  });
+
+  it('retries bridge probes before failing a resolved address', async (): Promise<void> => {
+    const cacheDir = await mkdtemp(join(tmpdir(), 'helios-hue-discovery-'));
+    const probe = vi.fn<(address: string, appKey: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('connect EHOSTUNREACH'))
+      .mockResolvedValueOnce(undefined);
+    const delay = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+
+    await expect(resolveBridges(
+      [{ id: 'ECB5FAFFFE2CA569', name: 'Bradgate', appKey: 'test-key', address: '192.168.86.199' }],
+      1,
+      join(cacheDir, 'bridges.json'),
+      2,
+      1,
+      probe,
+      delay,
+    )).resolves.toEqual([
+      { id: 'ECB5FAFFFE2CA569', name: 'Bradgate', appKey: 'test-key', address: '192.168.86.199' },
+    ]);
+
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(delay).toHaveBeenCalledOnce();
+  });
+
+  it('resolves both configured Bradgate bridges independently', async (): Promise<void> => {
+    const cacheDir = await mkdtemp(join(tmpdir(), 'helios-hue-discovery-'));
+    const probe = vi.fn<(address: string, appKey: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('connect EHOSTUNREACH'))
+      .mockResolvedValue(undefined);
+    const delay = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+
+    await expect(resolveBridges(
+      [
+        { id: 'ECB5FAFFFE2CA569', name: 'Bradgate', appKey: 'primary-key', address: '192.168.86.199' },
+        { id: 'ECB5FAFFFEBE1854', name: 'Bradgate 2', appKey: 'secondary-key', address: '192.168.86.248' },
+      ],
+      1,
+      join(cacheDir, 'bridges.json'),
+      2,
+      1,
+      probe,
+      delay,
+    )).resolves.toEqual([
+      { id: 'ECB5FAFFFE2CA569', name: 'Bradgate', appKey: 'primary-key', address: '192.168.86.199' },
+      { id: 'ECB5FAFFFEBE1854', name: 'Bradgate 2', appKey: 'secondary-key', address: '192.168.86.248' },
+    ]);
+
+    expect(probe).toHaveBeenCalledWith('192.168.86.199', 'primary-key');
+    expect(probe).toHaveBeenCalledWith('192.168.86.248', 'secondary-key');
   });
 });

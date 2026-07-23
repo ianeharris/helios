@@ -54,6 +54,16 @@ export interface HueRoomResource {
   services: Array<{ rid: string; rtype: string }>;
 }
 
+export interface HueZoneResource {
+  id: string;
+  type: 'zone';
+  metadata: { name: string; archetype: string };
+  children: Array<{ rid: string; rtype: string }>;
+  services: Array<{ rid: string; rtype: string }>;
+}
+
+export type HueAreaResource = HueRoomResource | HueZoneResource;
+
 export interface HueGroupedLightResource {
   id: string;
   type: 'grouped_light';

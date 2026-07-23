@@ -11,6 +11,7 @@ import type {
   HueRoomResource,
   HueGroupedLightResource,
   HueSceneResource,
+  HueZoneResource,
 } from './types.js';
 import type { BridgeConfig } from './types.js';
 
@@ -93,6 +94,9 @@ export const fetchLights = (bridge: BridgeConfig): Promise<HueLightResource[]> =
 export const fetchRooms = (bridge: BridgeConfig): Promise<HueRoomResource[]> =>
   clip<HueRoomResource[]>(bridge, 'resource/room');
 
+export const fetchZones = (bridge: BridgeConfig): Promise<HueZoneResource[]> =>
+  clip<HueZoneResource[]>(bridge, 'resource/zone');
+
 export const fetchGroupedLights = (bridge: BridgeConfig): Promise<HueGroupedLightResource[]> =>
   clip<HueGroupedLightResource[]>(bridge, 'resource/grouped_light');
 
@@ -104,17 +108,34 @@ export const setLightState = async (
   lightId: string,
   state: { on?: boolean; brightness?: number; colorTemp?: number },
 ): Promise<void> => {
+  await setResourceState(bridge, 'light', lightId, state);
+};
+
+export const setGroupedLightState = async (
+  bridge: BridgeConfig,
+  groupedLightId: string,
+  state: { on?: boolean; brightness?: number },
+): Promise<void> => {
+  await setResourceState(bridge, 'grouped_light', groupedLightId, state);
+};
+
+const setResourceState = async (
+  bridge: BridgeConfig,
+  resourceType: 'light' | 'grouped_light',
+  resourceId: string,
+  state: { on?: boolean; brightness?: number; colorTemp?: number },
+): Promise<void> => {
   const body: Record<string, unknown> = {};
   if (state.on !== undefined) body['on'] = { on: state.on };
   if (state.brightness !== undefined) body['dimming'] = { brightness: state.brightness };
   if (state.colorTemp !== undefined) body['color_temperature'] = { mirek: state.colorTemp };
 
-  const res = await requestHueApi<unknown>(bridge.address, bridge.appKey, `resource/light/${lightId}`, {
+  const res = await requestHueApi<unknown>(bridge.address, bridge.appKey, `resource/${resourceType}/${resourceId}`, {
     method: 'PUT',
     body,
   });
   if (res.statusCode < 200 || res.statusCode >= 300) {
-    throw new Error(`Set light ${lightId} failed: HTTP ${res.statusCode}`);
+    throw new Error(`Set ${resourceType} ${resourceId} failed: HTTP ${res.statusCode}`);
   }
 };
 

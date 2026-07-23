@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { HueLightResource, HueRoomResource, HueGroupedLightResource, HueSceneResource, HueLightState, HueRoomState } from '../types.js';
+import type { HueLightResource, HueRoomResource, HueGroupedLightResource, HueSceneResource, HueLightState, HueRoomState, HueZoneResource } from '../types.js';
 
 // We test the BridgeManager's SSE event handling in isolation by mocking
 // the API calls and SSE connection, then feeding synthetic events.
@@ -7,6 +7,7 @@ import type { HueLightResource, HueRoomResource, HueGroupedLightResource, HueSce
 vi.mock('../api.js', () => ({
   fetchLights: vi.fn(),
   fetchRooms: vi.fn(),
+  fetchZones: vi.fn(),
   fetchGroupedLights: vi.fn(),
   fetchScenes: vi.fn(),
 }));
@@ -18,7 +19,7 @@ vi.mock('../sse.js', () => ({
   })),
 }));
 
-import { fetchLights, fetchRooms, fetchGroupedLights, fetchScenes } from '../api.js';
+import { fetchLights, fetchRooms, fetchZones, fetchGroupedLights, fetchScenes } from '../api.js';
 import { BridgeManager } from '../bridge.js';
 
 const bridge = { id: 'ECB5FAFFFE2CA569', address: '192.168.86.199', name: 'Bradgate', appKey: 'test-key' };
@@ -52,6 +53,23 @@ const makeGroupedLight = (overrides: Partial<HueGroupedLightResource> = {}): Hue
   ...overrides,
 });
 
+const makeZone = (overrides: Partial<HueZoneResource> = {}): HueZoneResource => ({
+  id: 'zone-1',
+  type: 'zone',
+  metadata: { name: 'Downstairs', archetype: 'living_room' },
+  children: [{ rid: 'device-1', rtype: 'device' }],
+  services: [{ rid: 'gl-zone-1', rtype: 'grouped_light' }],
+  ...overrides,
+});
+
+const makeScene = (overrides: Partial<HueSceneResource> = {}): HueSceneResource => ({
+  id: 'scene-1',
+  type: 'scene',
+  metadata: { name: 'Relax' },
+  group: { rid: 'room-1', rtype: 'room' },
+  ...overrides,
+});
+
 let publishedMessages: Array<{ topic: string; payload: string }> = [];
 const publishState = vi.fn((topic: string, payload: unknown): Promise<void> => {
   publishedMessages.push({ topic, payload: JSON.stringify(payload) });
@@ -63,6 +81,7 @@ beforeEach(() => {
   publishState.mockClear();
   vi.mocked(fetchLights).mockResolvedValue([makeLight()]);
   vi.mocked(fetchRooms).mockResolvedValue([makeRoom()]);
+  vi.mocked(fetchZones).mockResolvedValue([] as HueZoneResource[]);
   vi.mocked(fetchGroupedLights).mockResolvedValue([makeGroupedLight()]);
   vi.mocked(fetchScenes).mockResolvedValue([] as HueSceneResource[]);
 });
@@ -128,6 +147,62 @@ describe('BridgeManager', () => {
     expect(discovery.devices[0]!.rawState).toMatchObject({
       bridgeId: bridge.id,
       resourceId: 'light-1',
+      areaIds: [`hue/${bridge.id}/room/room-1`],
+    });
+  });
+
+  it('discovers Hue zones as independently controllable areas', async () => {
+    vi.mocked(fetchZones).mockResolvedValue([makeZone()]);
+
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
+    await manager.start();
+
+    const discoveryMsg = publishedMessages.find((m) =>
+      m.topic === `helios/registry/hue/${bridge.id}/discovery`,
+    );
+    const discovery = JSON.parse(discoveryMsg!.payload) as {
+      rooms: Array<{ id: string; rawState: { areaType: string; groupedLightId: string } }>;
+      devices: Array<{ rawState: { areaIds: string[] } }>;
+    };
+    expect(discovery.rooms).toContainEqual(expect.objectContaining({
+      id: `hue/${bridge.id}/zone/zone-1`,
+      rawState: expect.objectContaining({ areaType: 'zone', groupedLightId: 'gl-zone-1' }),
+    }));
+    expect(discovery.devices[0]?.rawState.areaIds).toContain(`hue/${bridge.id}/zone/zone-1`);
+  });
+
+  it('maps Hue scenes that point directly at zones into registry area IDs', async () => {
+    vi.mocked(fetchZones).mockResolvedValue([makeZone()]);
+    vi.mocked(fetchScenes).mockResolvedValue([makeScene({ group: { rid: 'zone-1', rtype: 'zone' } })]);
+
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
+    await manager.start();
+
+    const discoveryMsg = publishedMessages.find((m) =>
+      m.topic === `helios/registry/hue/${bridge.id}/discovery`,
+    );
+    const discovery = JSON.parse(discoveryMsg!.payload) as {
+      scenes: Array<{ roomId: string | null }>;
+    };
+    expect(discovery.scenes[0]?.roomId).toBe(`hue/${bridge.id}/zone/zone-1`);
+  });
+
+  it('maps Hue scene groups that point directly at rooms into registry room IDs', async () => {
+    vi.mocked(fetchScenes).mockResolvedValue([makeScene()]);
+
+    const manager = new BridgeManager(bridge, publishState, 120_000, 5_000);
+    await manager.start();
+
+    const discoveryMsg = publishedMessages.find((m) =>
+      m.topic === `helios/registry/hue/${bridge.id}/discovery`,
+    );
+    expect(discoveryMsg).toBeDefined();
+    const discovery = JSON.parse(discoveryMsg!.payload) as {
+      scenes: Array<{ id: string; roomId: string | null }>;
+    };
+    expect(discovery.scenes[0]).toMatchObject({
+      id: `hue/${bridge.id}/scene/scene-1`,
+      roomId: `hue/${bridge.id}/room/room-1`,
     });
   });
 });
