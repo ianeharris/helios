@@ -8,6 +8,10 @@ Helios production runs on the M1 Mac mini (`m1-mac-mini`, Tailscale `100.127.66.
 
 The 10 July 2026 deployment (commit `8c30b8f`) includes the WS-A foundations: shared adapter runtime, API command publishing, API WebSocket stream, adapter health/metrics, Hue discovery snapshots, registry upserts, event writes, stream-backed Energy hooks and a registry-backed Rooms screen. It also uses London-time Octopus scheduling, recorded-fixture adapter contracts, immutable image tags and a pre-deploy container-build gate. The live implementation status and open loops are maintained in the vault implementation plan.
 
+## Design review
+
+The clickable approval prototype and visual-reference library live in [`docs/design/`](docs/design/). Treat the vault UI and Automation Spec as the product-quality source of truth, and use the saved prototype to review form, function and cross-device composition before building user-facing PWA slices.
+
 ## Self-hosted model
 
 Helios is one private household installation per deployment. Device access, vendor credentials, room data and automation rules remain inside that household's own network and encrypted configuration. The core is designed to be portable, but packaged distribution is a later milestone after the Bradgate reference installation is a trusted daily driver.
@@ -16,9 +20,11 @@ Helios is one private household installation per deployment. Device access, vend
 
 The Helios core, database, MQTT broker, web application and cloud-facing adapters run in Docker Compose on OrbStack. LAN adapters use the same MQTT and adapter-SDK contracts, but their runtime is selected by required network capabilities: unicast device access, mDNS, SSDP, inbound callbacks and restart recovery.
 
-The M1 conformance check found that OrbStack is not a supported LAN runtime for Hue at Bradgate: the macOS host can browse `_hue._tcp.local` and reach both bridges over HTTPS, while the Hue container cannot do so even with Docker host networking. Hue therefore runs as a native macOS `launchd` edge agent, publishing to the containerised Mosquitto broker. This is the supported model for later LAN integrations such as Sonos, Hikvision and Texecom unless their capability checks prove container operation reliable.
+The M1 conformance check found that OrbStack is not a supported LAN runtime for Hue at Bradgate: the macOS host can browse `_hue._tcp.local` and reach both bridges over HTTPS, while the Hue container cannot do so even with Docker host networking. Hue therefore runs as a root system `LaunchDaemon`, publishing to the containerised Mosquitto broker. The system-domain two-bridge conformance probe passed. User-context agents, including a system-domain job configured to run as the logged-in user, cannot make the required LAN connections and are unsupported. This capability-first model applies to Sonos, Hikvision and Texecom.
 
-The native agent uses macOS Bonjour (`dns-sd`), immutable Hue Bridge IDs, encrypted application keys and a verified-address cache. The host-side TCP proxy experiment is not production architecture and is deliberately excluded from deployment. The M1 health endpoint and native Hue-to-MQTT connection are verified after restart-recovery hardening; direct native discovery and authenticated probes against both Bradgate bridges also pass.
+The native adapter uses macOS Bonjour (`dns-sd`), immutable Hue Bridge IDs, encrypted application keys and a verified-address cache. It preserves bridge namespacing for rooms, zones, devices and scenes, retries each configured bridge independently, and treats Hue rooms and Hue zones as first-class controllable areas. The host-side TCP proxy experiment is not production architecture and is deliberately excluded from deployment. The live system daemon is healthy; the deployed registry now reports 14 rooms and 15 zones across the two Bradgate bridges, all with grouped-light command targets. The Rooms UI consumes retained live state, updates individual light state after accepted commands, and exposes on/off/brightness controls at individual-light, room and zone level. Treat Hue release code as privileged because the system daemon executes it; restart it only through an explicit administrative path.
+
+Mosquitto ACLs must allow adapters to publish retained discovery snapshots under `helios/registry/<adapter>/#` as well as their live state topics. Without that registry permission, physical Hue control can work while `/rooms` remains stale because the API never receives the updated discovery model.
 
 ## Mac mini setup checklist
 

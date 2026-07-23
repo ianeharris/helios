@@ -1,13 +1,15 @@
 # CLAUDE.md — Helios / Solar
 
 > This file lives at `~/Solar/CLAUDE.md` in the project repo. It is the entry point for every Claude Code session on this project.
-> Last updated: 2026-05-30
+> Last updated: 2026-07-23
 
 ---
 
 ## What this project is
 
 **Helios** is a self-hosted, single-household home automation platform. The 28 Bradgate deployment is the reference installation. It sits above the existing vendor apps (Hue, Sonos, Hikvision, Fox ESS, Texecom, Hive) and provides a single sophisticated control surface on macOS, iOS and iPadOS. Local-first. No cloud dependency. No recurring subscriptions.
+
+For user-facing work, read `docs/design/` alongside the vault's `Helios - UI and Automation Spec.md`. The vault defines product principles and the quality gate; the repository holds the reviewable interactive prototypes and visual-reference index. Do not implement a screen that has not been reviewed against both.
 
 The project folder on disk is `Solar`. The name Helios is chosen because solar energy from the house PV system is a first-class concern of the platform.
 
@@ -36,6 +38,8 @@ If starting work on a specific system, also read the relevant section of:
 These notes tell you exactly what phase we are in, what is done, what is pending, and what the next steps are. Do not guess or infer from the code alone — the vault is the source of truth for status.
 
 **At the end of every session**, update the Delivery Plan note with any phase status changes. Do not update this CLAUDE.md with status — the vault is the single source of truth.
+
+**Also at the end of every session, run `git status` in `~/Solar`.** Added 2026-07-23 after an incident where a substantial slice of the 15 July Rooms/zones work (Hue zone support, the API command path, the live-state-merge logic behind `/rooms` and `/devices`, the Rooms.tsx rewrite) was deployed to the M1 as a temporary local image and never committed — it sat on one laptop's disk for eight days with no git history at all. It happened because that deploy went around the normal CI path (which does `git pull --ff-only` and so forces a commit as a side effect) via a manual local build instead. If you ever deploy that way again, treat "commit this" as part of the same task, not a follow-up — and if a session ends with `~/Solar` dirty for any reason, say so explicitly in the vault Session Log's Open Loops rather than letting a clean-sounding wrap-up imply the code is safe.
 
 ---
 
