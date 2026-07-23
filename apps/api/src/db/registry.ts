@@ -10,13 +10,14 @@ export const upsertDiscovery = async (discovery: AdapterDiscoveryMessage): Promi
 
     for (const room of discovery.rooms ?? []) {
       await client.query(
-        `INSERT INTO rooms (id, name, floor, icon)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO rooms (id, name, floor, icon, raw_state)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
          ON CONFLICT (id) DO UPDATE SET
            name = EXCLUDED.name,
            floor = EXCLUDED.floor,
-           icon = EXCLUDED.icon`,
-        [room.id, room.name, room.floor ?? null, room.icon ?? null],
+           icon = EXCLUDED.icon,
+           raw_state = EXCLUDED.raw_state`,
+        [room.id, room.name, room.floor ?? null, room.icon ?? null, JSON.stringify(room.rawState ?? {})],
       );
     }
 

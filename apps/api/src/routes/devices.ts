@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db/client.js';
 import { publishMqtt } from '../mqtt/client.js';
+import { mqttGet } from '../mqtt/cache.js';
 
 type DeviceRow = {
   id: string;
@@ -228,9 +229,17 @@ const deviceResponse = (row: DeviceRow): Record<string, unknown> => ({
   reachable: row.reachable,
   role: row.role,
   tags: row.tags,
-  rawState: row.raw_state,
+  rawState: currentRawState(row),
   updatedAt: row.updated_at.toISOString(),
 });
+
+const currentRawState = (row: DeviceRow): unknown => {
+  if (row.vendor !== 'hue' || row.kind !== 'light') return row.raw_state;
+
+  const liveState = mqttGet<Record<string, unknown>>(`helios/${row.id}`);
+  if (!liveState) return row.raw_state;
+  return { ...objectBody(row.raw_state), ...liveState };
+};
 
 const addOptionalUpdate = (fields: string[], params: unknown[], column: string, value: unknown): void => {
   if (value === undefined) return;
