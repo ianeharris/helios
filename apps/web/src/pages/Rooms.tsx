@@ -1,29 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  applyHueLightState,
+  applyHueRoomState,
+  applyLightCommandState,
+  applyRoomCommandState,
+  type RoomDevice,
+  type RoomRecord,
+} from './roomsState.js';
 
 type LoadStatus = 'loading' | 'ok' | 'error';
 
-type Room = {
-  id: string;
-  name: string;
-  floor: number | null;
-  icon: string | null;
-};
+type Room = RoomRecord;
 
-type Device = {
-  id: string;
-  vendor: string;
-  kind: string;
-  name: string;
-  roomId: string | null;
-  reachable: boolean;
-  role: string | null;
-  tags: string[];
-  rawState: {
-    on?: boolean;
-    brightness?: number;
-  } | null;
-  updatedAt: string;
-};
+type Device = RoomDevice;
 
 type Scene = {
   id: string;
@@ -37,6 +26,12 @@ type RegistryState = {
   rooms: Room[];
   devices: Device[];
   scenes: Scene[];
+};
+
+type MqttStreamEvent = {
+  topic: string;
+  payload: unknown;
+  receivedAt: string;
 };
 
 const loadJson = async <T,>(path: string): Promise<T> => {
@@ -63,7 +58,23 @@ const recallScene = async (roomId: string, sceneId: string): Promise<void> => {
   if (!response.ok) throw new Error('scene recall failed');
 };
 
-const useRegistry = (): { state: RegistryState; status: LoadStatus; error: string | null; reload: () => void } => {
+const sendRoomCommand = async (roomId: string, command: Record<string, unknown>): Promise<void> => {
+  const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/command`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  if (!response.ok) throw new Error('room command failed');
+};
+
+const useRegistry = (): {
+  state: RegistryState;
+  status: LoadStatus;
+  error: string | null;
+  reload: () => void;
+  updateLightCommandState: (deviceId: string, command: { on: boolean }) => void;
+  updateRoomCommandState: (roomId: string, command: { on?: boolean; brightness?: number }) => void;
+} => {
   const [state, setState] = useState<RegistryState>({ rooms: [], devices: [], scenes: [] });
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +110,48 @@ const useRegistry = (): { state: RegistryState; status: LoadStatus; error: strin
     };
   }, [reloadToken]);
 
-  return { state, status, error, reload: () => setReloadToken((value) => value + 1) };
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${protocol}//${window.location.host}/api/stream?topics=${encodeURIComponent('helios/hue/#')}`);
+
+    socket.addEventListener('message', (message) => {
+      try {
+        const event = JSON.parse(String(message.data)) as MqttStreamEvent;
+        setState((current) => ({
+          ...current,
+          rooms: applyHueRoomState(current.rooms, event.topic, event.payload),
+          devices: applyHueLightState(current.devices, event.topic, event.payload, event.receivedAt),
+        }));
+      } catch {
+        // Keep the last known state when a stream message is malformed.
+      }
+    });
+
+    return (): void => socket.close();
+  }, []);
+
+  const updateLightCommandState = (deviceId: string, command: { on: boolean }): void => {
+    setState((current) => ({
+      ...current,
+      devices: applyLightCommandState(current.devices, deviceId, command),
+    }));
+  };
+
+  const updateRoomCommandState = (roomId: string, command: { on?: boolean; brightness?: number }): void => {
+    setState((current) => ({
+      ...current,
+      rooms: applyRoomCommandState(current.rooms, roomId, command),
+    }));
+  };
+
+  return {
+    state,
+    status,
+    error,
+    reload: () => setReloadToken((value) => value + 1),
+    updateLightCommandState,
+    updateRoomCommandState,
+  };
 };
 
 const roomSort = (a: Room, b: Room): number => {
@@ -113,14 +165,31 @@ const RoomCard = ({
   room,
   devices,
   scenes,
+  onLightCommandAccepted,
+  onRoomCommandAccepted,
 }: {
   room: Room;
   devices: Device[];
   scenes: Scene[];
+  onLightCommandAccepted: (deviceId: string, command: { on: boolean }) => void;
+  onRoomCommandAccepted: (roomId: string, command: { on?: boolean; brightness?: number }) => void;
 }): JSX.Element => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
-  const lights = devices.filter((device) => device.vendor === 'hue' && device.kind === 'light');
+  const lights = devices.filter((device) =>
+    device.vendor === 'hue'
+    && device.kind === 'light'
+    && (device.roomId === room.id || deviceAreaIds(device).includes(room.id)),
+  );
+  const hasGroupedLight = typeof room.rawState?.['groupedLightId'] === 'string';
+  const roomOn = room.rawState?.['anyOn'] === true;
+  const areaType = room.rawState?.['areaType'] === 'zone' ? 'Zone' : 'Room';
+  const roomBrightness = typeof room.rawState?.['brightness'] === 'number'
+    ? Math.round(room.rawState.brightness)
+    : 100;
+  const [intensity, setIntensity] = useState(roomBrightness);
+
+  useEffect(() => setIntensity(roomBrightness), [roomBrightness]);
 
   const run = async (id: string, action: () => Promise<void>): Promise<void> => {
     setBusyId(id);
@@ -140,7 +209,7 @@ const RoomCard = ({
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-slate-100 truncate">{room.name}</h2>
           <p className="text-xs text-slate-500">
-            {lights.length} {lights.length === 1 ? 'light' : 'lights'} · {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}
+            {areaType} · {lights.length} {lights.length === 1 ? 'light' : 'lights'} · {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}
           </p>
         </div>
         {room.icon && (
@@ -149,6 +218,64 @@ const RoomCard = ({
           </span>
         )}
       </div>
+
+      {hasGroupedLight && (
+        <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-y border-slate-800 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-200">Area lights</p>
+            <p className="text-xs text-slate-500">{roomOn ? 'On' : 'Off'} · {intensity}%</p>
+            <input
+              aria-label={`${room.name} light intensity`}
+              className="mt-2 w-full accent-amber-400"
+              type="range"
+              min="1"
+              max="100"
+              value={intensity}
+              disabled={busyId !== null}
+              onChange={(event) => setIntensity(Number(event.target.value))}
+              onPointerUp={() => void run(`${room.id}:brightness`, async () => {
+                await sendRoomCommand(room.id, { brightness: intensity });
+                onRoomCommandAccepted(room.id, { brightness: intensity });
+              })}
+              onKeyUp={(event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) return;
+                void run(`${room.id}:brightness`, async () => {
+                  await sendRoomCommand(room.id, { brightness: intensity });
+                  onRoomCommandAccepted(room.id, { brightness: intensity });
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-1 w-24">
+            <button
+              onClick={() => void run(`${room.id}:on`, async () => {
+                await sendRoomCommand(room.id, { on: true });
+                onRoomCommandAccepted(room.id, { on: true });
+              })}
+              disabled={busyId !== null}
+              aria-pressed={roomOn}
+              className={`h-9 rounded text-xs font-medium disabled:opacity-40 ${roomOn
+                ? 'bg-amber-400 text-slate-950'
+                : 'bg-slate-700 text-slate-100 active:bg-slate-600'}`}
+            >
+              On
+            </button>
+            <button
+              onClick={() => void run(`${room.id}:off`, async () => {
+                await sendRoomCommand(room.id, { on: false });
+                onRoomCommandAccepted(room.id, { on: false });
+              })}
+              disabled={busyId !== null}
+              aria-pressed={!roomOn}
+              className={`h-9 rounded text-xs font-medium disabled:opacity-40 ${!roomOn
+                ? 'bg-slate-950 text-slate-100 ring-1 ring-slate-500'
+                : 'bg-slate-700 text-slate-300 active:bg-slate-700'}`}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+      )}
 
       {scenes.length > 0 && (
         <div className="grid grid-cols-2 gap-2">
@@ -183,16 +310,28 @@ const RoomCard = ({
                 </div>
                 <div className="grid grid-cols-2 gap-1 w-24">
                   <button
-                    onClick={() => void run(`${light.id}:on`, () => sendDeviceCommand(light.id, { on: true }))}
+                    onClick={() => void run(`${light.id}:on`, async () => {
+                      await sendDeviceCommand(light.id, { on: true });
+                      onLightCommandAccepted(light.id, { on: true });
+                    })}
                     disabled={busyId !== null || !light.reachable}
-                    className="h-9 rounded bg-slate-700 text-xs font-medium text-slate-100 disabled:opacity-40 active:bg-slate-600"
+                    aria-pressed={on}
+                    className={`h-9 rounded text-xs font-medium disabled:opacity-40 ${on
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-slate-700 text-slate-100 active:bg-slate-600'}`}
                   >
                     On
                   </button>
                   <button
-                    onClick={() => void run(`${light.id}:off`, () => sendDeviceCommand(light.id, { on: false }))}
+                    onClick={() => void run(`${light.id}:off`, async () => {
+                      await sendDeviceCommand(light.id, { on: false });
+                      onLightCommandAccepted(light.id, { on: false });
+                    })}
                     disabled={busyId !== null || !light.reachable}
-                    className="h-9 rounded bg-slate-950 text-xs font-medium text-slate-300 disabled:opacity-40 active:bg-slate-700"
+                    aria-pressed={!on}
+                    className={`h-9 rounded text-xs font-medium disabled:opacity-40 ${!on
+                      ? 'bg-slate-950 text-slate-100 ring-1 ring-slate-500'
+                      : 'bg-slate-700 text-slate-300 active:bg-slate-700'}`}
                   >
                     Off
                   </button>
@@ -209,8 +348,22 @@ const RoomCard = ({
   );
 };
 
+const deviceAreaIds = (device: Device): string[] => {
+  const areaIds = device.rawState?.['areaIds'];
+  return Array.isArray(areaIds)
+    ? areaIds.filter((areaId): areaId is string => typeof areaId === 'string')
+    : [];
+};
+
 export const Rooms = (): JSX.Element => {
-  const { state, status, error, reload } = useRegistry();
+  const {
+    state,
+    status,
+    error,
+    reload,
+    updateLightCommandState,
+    updateRoomCommandState,
+  } = useRegistry();
   const rooms = useMemo(() => [...state.rooms].sort(roomSort), [state.rooms]);
 
   return (
@@ -240,6 +393,8 @@ export const Rooms = (): JSX.Element => {
           room={room}
           devices={state.devices.filter((device) => device.roomId === room.id)}
           scenes={state.scenes.filter((scene) => scene.roomId === room.id)}
+          onLightCommandAccepted={updateLightCommandState}
+          onRoomCommandAccepted={updateRoomCommandState}
         />
       ))}
     </div>
