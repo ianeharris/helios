@@ -124,6 +124,10 @@ jobs:
             export PATH="/opt/homebrew/opt/node@22/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             cd ~/Solar
+            if ! sudo -n /bin/launchctl print system/com.helios.adapter-hue >/dev/null 2>&1; then
+              echo "ERROR: Hue system LaunchDaemon restart is not authorised for deployment" >&2
+              exit 1
+            fi
             git pull --ff-only
             plutil -lint infra/launchd/com.helios.adapter-hue.plist
             HELIOS_AGE_KEY_FILE=~/.config/helios/age.key bash infra/scripts/decrypt-secrets.sh
@@ -145,12 +149,14 @@ jobs:
             build_push adapters/foxess    helios-adapter-foxess
             cd infra/compose
             docker compose up -d --force-recreate --remove-orphans
-            mkdir -p ~/Library/LaunchAgents "$HOME/Library/Application Support/Helios" ~/Solar/logs
+            mkdir -p "$HOME/Library/Application Support/Helios" ~/Solar/logs
             launchctl bootout "gui/$UID/com.helios.hue-proxy" 2>/dev/null || true
             launchctl bootout "gui/$UID/com.helios.adapter-hue" 2>/dev/null || true
-            cp ../launchd/com.helios.adapter-hue.plist ~/Library/LaunchAgents/com.helios.adapter-hue.plist
-            launchctl bootstrap "gui/$UID" ~/Library/LaunchAgents/com.helios.adapter-hue.plist
-            launchctl kickstart -k "gui/$UID/com.helios.adapter-hue"
+            if ! sudo -n /bin/launchctl print system/com.helios.adapter-hue >/dev/null 2>&1; then
+              echo "ERROR: Hue system LaunchDaemon is not installed" >&2
+              exit 1
+            fi
+            sudo -n /bin/launchctl kickstart -k system/com.helios.adapter-hue
             docker compose ps
             sleep 10
             running_services="$(docker compose ps --status running --services)"

@@ -79,7 +79,7 @@ export const connect = async (
   brokerConnected.set({ adapter: name }, 0);
   lastPublish.set({ adapter: name }, 0);
 
-  console.log(`[${name}] connecting to MQTT at ${mqttUrl}`);
+  console.log(`[${name}] connecting to MQTT at ${redactUrlCredentials(mqttUrl)}`);
   const mqttClient = await mqtt.connectAsync(mqttUrl, {
     clientId,
     clean: true,
@@ -209,3 +209,15 @@ const createHealthServer = (
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: 'not found' }));
   });
+
+const redactUrlCredentials = (value: string): string => {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) {
+      return `${url.protocol}//<credentials>@${url.host}${url.pathname}${url.search}${url.hash}`;
+    }
+    return url.toString();
+  } catch {
+    return value.replace(/:\/\/([^:@/\s]+):([^@/\s]+)@/g, '://<user>:<redacted>@');
+  }
+};

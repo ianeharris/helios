@@ -15,7 +15,7 @@ TIMESTAMP=$(date +%Y%m%dT%H%M%S)
 REMOTE_FILE="$NAS_BACKUP_DIR/helios-$TIMESTAMP.dump"
 RETAIN_DAYS=30
 
-SSH="/usr/bin/ssh -i $NAS_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
+SSH="/usr/bin/ssh -i $NAS_KEY -o StrictHostKeyChecking=yes -o BatchMode=yes"
 
 # Pipe pg_dump directly to NAS over SSH - avoids SMB and temp file complexity
 /usr/local/bin/docker exec helios-db-1 \

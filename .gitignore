@@ -23,5 +23,14 @@ age.key
 # Container volumes baked out locally during dev
 infra/volumes/
 
+# Mosquitto broker credential file - generated locally, never committed
+infra/compose/mosquitto/passwd
+
+# Local runtime logs
+logs/
+
+# TypeScript incremental build info - local cache, not source
+*.tsbuildinfo
+
 # Test coverage
 coverage/

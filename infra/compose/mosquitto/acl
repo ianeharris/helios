@@ -4,13 +4,16 @@
 
 user octopus
 topic write helios/energy/#
+topic write helios/registry/octopus/#
 
 user hue
 topic readwrite helios/hue/#
+topic write helios/registry/hue/#
 
 user sonos
 topic write helios/audio/#
 topic read helios/audio/+/command
+topic write helios/registry/sonos/#
 
 user api
 topic read helios/#
@@ -21,13 +24,17 @@ topic write helios/security/#
 
 user foxess
 topic write helios/energy/foxess/#
+topic write helios/registry/foxess/#
 
 user hikvision
 topic write helios/security/cameras/#
+topic write helios/registry/hikvision/#
 
 user texecom
 topic write helios/security/alarm/#
+topic write helios/registry/texecom/#
 
 user hive
 topic write helios/heating/#
 topic read helios/heating/+/set
+topic write helios/registry/hive/#
